@@ -1,0 +1,311 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package fr.ryder.benoit.jmdictdroid
+
+import android.content.Intent
+import android.util.Log
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconToggleButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.util.Consumer
+import androidx.navigation.NavController
+import fr.ryder.benoit.jmdictdroid.ui.theme.ResultColors
+import fr.ryder.benoit.jmdictdroid.ui.theme.themeResultColors
+
+private const val SEARCH_RESULTS_LIMIT = 50
+
+@Composable
+fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                colors = appBarColors(),
+                title = {
+                    Text("Dictionary")
+                },
+                actions = {
+                    IconButton(onClick = { navController.navigate("database") }) {
+                        Icon(
+                            imageVector = Icons.Filled.Build,
+                            contentDescription = "Database",
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier.padding(innerPadding),
+        ) {
+            val activity = LocalContext.current.getComponentActivity()
+            val resultColors = themeResultColors()
+
+            var query by remember { mutableStateOf("") }
+            var reverse by remember { mutableStateOf(false) }
+            var resultText by remember { mutableStateOf<AnnotatedString?>(null) }
+
+            // Run search using current query, collect results
+            fun searchResults() {
+                val pattern = query.trim()
+                var result = emptyList<Jmdict.Entry>()
+                if (pattern.isNotEmpty()) {
+                    result = jmdictDb.search(pattern, reverse, SEARCH_RESULTS_LIMIT)
+                    Log.d(TAG, "new results: ${result.size}")
+                }
+                if (result.isEmpty()) {
+                    resultText = null
+                } else {
+                    resultText = buildResultText(entries = result, colors = resultColors)
+                }
+            }
+
+            // Run a search with given query if not null
+            fun searchWithQuery(newQuery: String?) {
+                if (newQuery != null) {
+                    query = newQuery
+                    searchResults()
+                }
+            }
+
+            // Handle initial query from activity intent
+            // Update query and run search on new activity intent
+            DisposableEffect(Unit) {
+                val intent = activity?.intent
+                if (intent != null) {
+                    searchWithQuery(intentToSearchText(intent))
+                }
+
+                //TODO
+                // - Find a way to switch to the right screen?
+                // - Set cursor position, make sure the keyboard is hidden, ...
+                val listener = Consumer<Intent> {
+                    searchWithQuery(intentToSearchText(it))
+                }
+                activity?.addOnNewIntentListener(listener)
+                onDispose {
+                    activity?.removeOnNewIntentListener(listener)
+                }
+            }
+
+            AppSearchBar(
+                query = query,
+                reverse = reverse,
+                onSearch = { searchResults() },
+                onQueryChange = { query = it },
+                onReverseChange = { reverse = it },
+                navController = navController,
+            )
+
+            //TODO Display a centered "no result" if there is no result
+            if (resultText != null) {
+                SelectionContainer {
+                    Text(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .verticalScroll(rememberScrollState()),
+                        text = resultText!!,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AppSearchBar(
+    query: String,
+    reverse: Boolean,
+    onSearch: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onReverseChange: (Boolean) -> Unit,
+    navController: NavController,
+) {
+    var expanded = false  //TODO never expand for now
+    SearchBar(
+        //modifier = Modifier.align(Alignment.TopCenter).semantics { traversalIndex = 0f },
+        inputField = {
+            SearchBarDefaults.InputField(
+                query = query,
+                onQueryChange = onQueryChange,
+                onSearch = { onQueryChange(query); onSearch() },
+                expanded = expanded,
+                onExpandedChange = { expanded = it },
+                placeholder = { Text("Translation") },
+                //TODO Add hamburger menu here
+                leadingIcon = { SearchMenuIcon(navController = navController) },
+                trailingIcon = { SearchWayToggle(reverse, onChange = onReverseChange) },
+            )
+        },
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+    ) {
+        // No suggestions
+    }
+}
+
+@Composable
+fun SearchWayToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
+    FilledIconToggleButton(
+        checked = checked,
+        onCheckedChange = onChange,
+    ) {
+        //TODO Use advance icon pack
+        if (checked) {
+            Icon(Icons.Filled.Face, contentDescription = "Japanese to English")
+        } else {
+            Icon(Icons.Default.Face, contentDescription = "English to Japanese")
+        }
+    }
+}
+
+@Composable
+fun SearchMenuIcon(
+    navController: NavController,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Default.Menu, contentDescription = "Menu")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("Database") },
+                onClick = { navController.navigate("database") },
+                leadingIcon = { Icon(Icons.Filled.Build, contentDescription = null) }
+            )
+        }
+    }
+}
+
+fun buildResultText(entries: List<Jmdict.Entry>, colors: ResultColors): AnnotatedString {
+    val japStyle = SpanStyle(color = colors.jap, fontSize = 22.sp)
+    val senseNumStyle = SpanStyle(color = colors.senseNum)
+    val sensePosStyle = SpanStyle(color = colors.sensePos)
+    val senseAttrStyle = SpanStyle(color = colors.senseAttr)
+    val senseInfoStyle = SpanStyle(fontStyle = FontStyle.Italic)
+    val glossTypeStyle = SpanStyle(color = colors.glossType)
+    val blankLineStyle = SpanStyle(fontSize = 6.sp)
+
+    return buildAnnotatedString {
+        for (entry in entries) {
+            // Japanese text: kanji then reading
+            withStyle(japStyle) {
+                if (entry.kanjis.isNotEmpty()) {
+                    append(entry.kanjis.joinToString(", ") { it.text })
+                    append(" / ")
+                }
+                append(entry.readings.joinToString(", ") { it.text })
+                append("\n")
+            }
+
+            // Senses, one per line
+            for ((iSense, sense) in entry.senses.withIndex()) {
+                // Sense number
+                withStyle(senseNumStyle) {
+                    append("${iSense + 1}) ")
+                }
+
+                // Part of speech
+                if (sense.partOfSpeech.isNotEmpty()) {
+                    withStyle(sensePosStyle) {
+                        append(sense.partOfSpeech.joinToString(","))
+                        append(" ")
+                    }
+                }
+
+                // Attributes
+                if (sense.fields.isNotEmpty() || sense.miscs.isNotEmpty()) {
+                    withStyle(senseAttrStyle) {
+                        append("[")
+                        append((sense.fields.asSequence() + sense.miscs.asSequence()).joinToString(","))
+                        append("] ")
+                    }
+                }
+
+                // Informations
+                if (sense.infos.isNotEmpty()) {
+                    withStyle(senseInfoStyle) {
+                        append("(")
+                        append(sense.infos.joinToString("; "))
+                        append(") ")
+                    }
+                }
+
+                // Glosses
+                for ((iGloss, gloss) in sense.glosses.withIndex()) {
+                    if (iGloss != 0) {
+                        append("; ")
+                    }
+                    if (gloss.gtype != null) {
+                        withStyle(glossTypeStyle) {
+                            append("(${gloss.gtype}) ")
+                        }
+                    }
+                    append(gloss.text)
+                }
+                append("\n")
+            }
+            withStyle(blankLineStyle) { append("\n") }
+        }
+    }
+}
+
