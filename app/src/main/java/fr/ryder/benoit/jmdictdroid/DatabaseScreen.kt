@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -28,12 +28,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import kotlinx.coroutines.CoroutineDispatcher
@@ -124,46 +125,35 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
 @Composable
 fun JmdictTerms() {
     val annotatedString = buildAnnotatedString {
+        val linkStyles = TextLinkStyles(
+            style = SpanStyle(color = Color.Blue),
+            hoveredStyle = SpanStyle(textDecoration = TextDecoration.Underline)
+        )
+
         append("This application uses the ")
 
-        //TODO Use addLink() helper
-
-        pushStringAnnotation(tag = "URL", annotation = "https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project")
-        withStyle(style = SpanStyle(textDecoration = TextDecoration.Underline, color = Color.Blue)) {
+        withLink(LinkAnnotation.Url("https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project", linkStyles)) {
             append("JMdict")
         }
-        pop()
 
         append(" dictionary files. These files are the property of the ")
 
-        pushStringAnnotation(tag = "URL", annotation = "https://www.edrdg.org/")
-        withStyle(style = SpanStyle(textDecoration = TextDecoration.Underline, color = Color.Blue)) {
+        withLink(LinkAnnotation.Url("https://www.edrdg.org/", linkStyles)) {
             append("Electronic Dictionary Research and Development Group")
         }
-        pop()
 
         append(", and are used in conformance with the Group's ")
 
-        pushStringAnnotation(tag = "URL", annotation = "https://www.edrdg.org/edrdg/licence.html")
-        withStyle(style = SpanStyle(textDecoration = TextDecoration.Underline, color = Color.Blue)) {
+        withLink(LinkAnnotation.Url("https://www.edrdg.org/edrdg/licence.html", linkStyles)) {
             append("licence")
         }
-        pop()
 
         append(".")
     }
 
-    val uriHandler = LocalUriHandler.current
-    ClickableText(
+    BasicText(
         modifier = Modifier.padding(12.dp),
         text = annotatedString,
-        onClick = { offset ->
-            annotatedString.getStringAnnotations(
-                tag = "URL", start = offset, end = offset
-            ).firstOrNull()?.let { annotation ->
-                uriHandler.openUri(annotation.item)
-            }
-        }
     )
 }
 
