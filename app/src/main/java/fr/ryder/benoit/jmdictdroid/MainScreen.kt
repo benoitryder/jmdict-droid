@@ -8,14 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -26,7 +25,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarColors
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -71,10 +70,10 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
             result = jmdictDb.search(pattern, reverse, SEARCH_RESULTS_LIMIT)
             Log.d(TAG, "new results: ${result.size}")
         }
-        if (result.isEmpty()) {
-            resultText = null
+        resultText = if (result.isEmpty()) {
+            null
         } else {
-            resultText = buildResultText(entries = result, colors = resultColors)
+            buildResultText(entries = result, colors = resultColors)
         }
     }
 
@@ -214,81 +213,86 @@ fun SearchMenuIcon(
             DropdownMenuItem(
                 text = { Text("Database") },
                 onClick = { navController.navigate("database") },
-                leadingIcon = { Icon(Icons.Filled.Build, contentDescription = null) }
+                leadingIcon = { Icon(Icons.Filled.Storage, contentDescription = null) }
             )
         }
     }
 }
 
 fun buildResultText(entries: List<Jmdict.Entry>, colors: ResultColors): AnnotatedString {
-    val japStyle = SpanStyle(color = colors.jap, fontSize = 22.sp)
+    val defaultStyle = SpanStyle(fontSize = 16.sp)
+    val japStyle = SpanStyle(color = colors.jap, fontSize = 20.sp)
     val senseNumStyle = SpanStyle(color = colors.senseNum)
     val sensePosStyle = SpanStyle(color = colors.sensePos)
     val senseAttrStyle = SpanStyle(color = colors.senseAttr)
     val senseInfoStyle = SpanStyle(fontStyle = FontStyle.Italic)
     val glossTypeStyle = SpanStyle(color = colors.glossType)
-    val blankLineStyle = SpanStyle(fontSize = 6.sp)
 
     return buildAnnotatedString {
-        for (entry in entries) {
-            // Japanese text: kanji then reading
-            withStyle(japStyle) {
-                if (entry.kanjis.isNotEmpty()) {
-                    append(entry.kanjis.joinToString(", ") { it.text })
-                    append(" / ")
-                }
-                append(entry.readings.joinToString(", ") { it.text })
-                append("\n")
-            }
-
-            // Senses, one per line
-            for ((iSense, sense) in entry.senses.withIndex()) {
-                // Sense number
-                withStyle(senseNumStyle) {
-                    append("${iSense + 1}) ")
-                }
-
-                // Part of speech
-                if (sense.partOfSpeech.isNotEmpty()) {
-                    withStyle(sensePosStyle) {
-                        append(sense.partOfSpeech.joinToString(","))
-                        append(" ")
+        withStyle(defaultStyle) {
+            for (entry in entries) {
+                // Japanese text: kanji then reading
+                withStyle(japStyle) {
+                    if (entry.kanjis.isNotEmpty()) {
+                        append(entry.kanjis.joinToString(", ") { it.text })
+                        append(" / ")
                     }
+                    append(entry.readings.joinToString(", ") { it.text })
+                    append("\n")
                 }
 
-                // Attributes
-                if (sense.fields.isNotEmpty() || sense.miscs.isNotEmpty()) {
-                    withStyle(senseAttrStyle) {
-                        append("[")
-                        append((sense.fields.asSequence() + sense.miscs.asSequence()).joinToString(","))
-                        append("] ")
+                // Senses, one per line
+                for ((iSense, sense) in entry.senses.withIndex()) {
+                    // Sense number
+                    withStyle(senseNumStyle) {
+                        append("${iSense + 1}) ")
                     }
-                }
 
-                // Informations
-                if (sense.infos.isNotEmpty()) {
-                    withStyle(senseInfoStyle) {
-                        append("(")
-                        append(sense.infos.joinToString("; "))
-                        append(") ")
-                    }
-                }
-
-                // Glosses
-                for ((iGloss, gloss) in sense.glosses.withIndex()) {
-                    if (iGloss != 0) {
-                        append("; ")
-                    }
-                    if (gloss.gtype != null) {
-                        withStyle(glossTypeStyle) {
-                            append("(${gloss.gtype}) ")
+                    // Part of speech
+                    if (sense.partOfSpeech.isNotEmpty()) {
+                        withStyle(sensePosStyle) {
+                            append(sense.partOfSpeech.joinToString(","))
+                            append(" ")
                         }
                     }
-                    append(gloss.text)
+
+                    // Attributes
+                    if (sense.fields.isNotEmpty() || sense.miscs.isNotEmpty()) {
+                        withStyle(senseAttrStyle) {
+                            append("[")
+                            append((sense.fields.asSequence() + sense.miscs.asSequence()).joinToString(","))
+                            append("] ")
+                        }
+                    }
+
+                    // Informations
+                    if (sense.infos.isNotEmpty()) {
+                        withStyle(senseInfoStyle) {
+                            append("(")
+                            append(sense.infos.joinToString("; "))
+                            append(") ")
+                        }
+                    }
+
+                    // Glosses
+                    for ((iGloss, gloss) in sense.glosses.withIndex()) {
+                        if (iGloss != 0) {
+                            append("; ")
+                        }
+                        if (gloss.gtype != null) {
+                            withStyle(glossTypeStyle) {
+                                append("(${gloss.gtype}) ")
+                            }
+                        }
+                        append(gloss.text)
+                    }
+                    append("\n")
                 }
-                append("\n")
+
+                // Change style of previous line break, to have a nice separator
+                addStyle(ParagraphStyle(lineHeight = 1.sp), start = length - 1, end = length)
+                addStyle(SpanStyle(fontSize = 9.sp), start = length - 1, end = length)
             }
-            withStyle(blankLineStyle) { append("\n") }
         }
     }
 }
