@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,7 @@ import androidx.core.util.Consumer
 import androidx.navigation.NavController
 import fr.ryder.benoit.jmdictdroid.ui.theme.ResultColors
 import fr.ryder.benoit.jmdictdroid.ui.theme.themeResultColors
+import kotlinx.coroutines.launch
 
 private const val SEARCH_RESULTS_LIMIT = 50
 
@@ -61,6 +63,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
     var query by remember { mutableStateOf("") }
     var reverse by remember { mutableStateOf(false) }
     var resultText by remember { mutableStateOf<AnnotatedString?>(null) }
+    var resultScroll = rememberScrollState()
 
     // Run search using current query, collect results
     fun searchResults() {
@@ -105,6 +108,11 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
         }
     }
 
+    // Reset scroll when result is updated
+    LaunchedEffect(resultText) {
+        resultScroll.scrollTo(0)
+    }
+
     Scaffold(
         topBar = {
             Surface(
@@ -128,12 +136,11 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
                     Text(
                         modifier = Modifier
                             .padding(8.dp)
-                            .verticalScroll(rememberScrollState()),
+                            .verticalScroll(resultScroll),
                         text = resultText!!,
                     )
                 }
             } else {
-                //TODO Improve
                 Text(
                     modifier = Modifier
                         .padding(vertical = 24.dp)
