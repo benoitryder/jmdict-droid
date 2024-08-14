@@ -39,6 +39,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val jmdictDb = JmdictDb(this)
+        val startDestination = if (jmdictDb.isInitialized()) "main" else "database"
+
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color(0x40000000).toArgb()),
             navigationBarStyle = SystemBarStyle.dark(Color(0x40000000).toArgb()),
@@ -47,7 +49,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppMaterialTheme {
                 val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = "main") {
+                NavHost(navController = navController, startDestination = startDestination) {
                     composable("main") {
                         MainScreen(navController, jmdictDb)
                     }

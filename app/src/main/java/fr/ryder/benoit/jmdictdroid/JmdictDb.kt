@@ -3,7 +3,9 @@
 package fr.ryder.benoit.jmdictdroid
 
 import android.content.Context
+import android.database.DatabaseUtils
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteException
 import android.util.Log
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -78,6 +80,15 @@ private typealias ImportProgress = (String) -> Unit
  */
 class JmdictDb(context: Context) {
     private val db = openJmdictDatabase(context)
+
+    // Return true if the database is initialized with content
+    fun isInitialized(): Boolean {
+        try {
+            return DatabaseUtils.queryNumEntries(db, "gloss") > 0
+        } catch (_: SQLiteException) {
+            return false  // table does not exist
+        }
+    }
 
     // Import JMdict, recreate the database
     //
