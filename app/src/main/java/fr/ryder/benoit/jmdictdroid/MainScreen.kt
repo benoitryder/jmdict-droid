@@ -14,7 +14,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
-import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -54,7 +53,6 @@ import androidx.core.util.Consumer
 import androidx.navigation.NavController
 import fr.ryder.benoit.jmdictdroid.ui.theme.ResultColors
 import fr.ryder.benoit.jmdictdroid.ui.theme.themeResultColors
-import kotlinx.coroutines.launch
 
 private const val SEARCH_RESULTS_LIMIT = 50
 

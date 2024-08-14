@@ -76,7 +76,7 @@ private typealias ImportProgress = (String) -> Unit
  *
  * All queries go through this method. This avoid messy concurrent accesses when database is recreated. 
  */
-class JmdictDb(private val context: Context) {
+class JmdictDb(context: Context) {
     private val db = openJmdictDatabase(context)
 
     // Import JMdict, recreate the database
@@ -270,7 +270,7 @@ class JmdictDb(private val context: Context) {
 
 
 private fun patternToSql(pattern: String): String {
-    var query = pattern
+    val query = pattern
         .replace('*', '%')
         .replace('＊', '%')
         .replace('％', '%')

@@ -5,6 +5,7 @@ package fr.ryder.benoit.jmdictdroid
 import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
@@ -80,6 +81,7 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
             )
 
             TextField(
+                modifier = Modifier.fillMaxWidth().padding(15.dp),
                 value = dictUrl,
                 onValueChange = { dictUrl = it },
                 label = { Text("Dictionary URL") },
@@ -113,6 +115,9 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                     textAlign = TextAlign.Center,
                     text = statusMessage,
                 )
+            } else {
+                // Add an empty text to avoid shifting JmdictTerms when download starts
+                Text("\n")
             }
 
             JmdictTerms()

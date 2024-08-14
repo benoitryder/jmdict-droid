@@ -82,7 +82,7 @@ private object Converter {
         "ヴ" to "vu",
         // Symbols
         "〜" to "~", "。" to ".", "、" to ",", "　" to " ",
-    );
+    )
 
     val RE = Regex(CONVERSION_TABLE.keys.joinToString("|"))
     val RE_CONSONANT = Regex("[っッ]([bcdfghjkmnprstvwz])")
