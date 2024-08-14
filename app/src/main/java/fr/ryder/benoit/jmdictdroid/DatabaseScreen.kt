@@ -77,7 +77,7 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
 
             Text(
                 modifier = Modifier.padding(12.dp),
-                text = "Use the button below to create or update the dictionary database from JMdict data. This will take several minutes.",
+                text = "Use the button below to create or update the dictionary database from JMdict data. This may take several minutes.",
             )
 
             TextField(
