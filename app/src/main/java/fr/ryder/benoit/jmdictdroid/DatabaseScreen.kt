@@ -6,18 +6,16 @@ import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -73,13 +71,19 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
             var statusMessage by remember { mutableStateOf("") }
             var errorMessage by remember { mutableStateOf("") }
             var inProgress by remember { mutableStateOf(false) }
+            var dictUrl by remember { mutableStateOf(JMDICT_URL) }
             val scope = rememberCoroutineScope()
-
-            JmdictTerms()
 
             Text(
                 modifier = Modifier.padding(12.dp),
-                text = "Use the button below to create or update the dictionary database from JMdict data. This may take several minutes.",
+                text = "Use the button below to create or update the dictionary database from JMdict data. This will take several minutes.",
+            )
+
+            TextField(
+                value = dictUrl,
+                onValueChange = { dictUrl = it },
+                label = { Text("Dictionary URL") },
+                singleLine = true,
             )
 
             Button(
@@ -88,7 +92,7 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                 onClick = {
                     inProgress = true
                     scope.launch {
-                        errorMessage = downloadAndUpdateDatabase(jmdictDb) { status -> statusMessage = status }
+                        errorMessage = downloadAndUpdateDatabase(jmdictDb, dictUrl) { status -> statusMessage = status }
                         inProgress = false
                     }
                 }
@@ -111,13 +115,7 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                 )
             }
 
-            if (inProgress) {
-                CircularProgressIndicator(
-                    modifier = Modifier.width(64.dp).padding(12.dp),
-                    color = MaterialTheme.colorScheme.secondary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                )
-            }
+            JmdictTerms()
         }
     }
 }
@@ -159,12 +157,12 @@ fun JmdictTerms() {
 
 
 // Download and update the database, return an error message, empty on success
-private suspend fun downloadAndUpdateDatabase(db: JmdictDb, updateStatus: (String) -> Unit): String {
+private suspend fun downloadAndUpdateDatabase(db: JmdictDb, dictUrl: String, updateStatus: (String) -> Unit): String {
     Log.i(TAG, "Download JMdict XML file")
     updateStatus("Download and parse JMdict...")
     val jmdict = try {
         getResultWithContext(Dispatchers.IO) {
-            Jmdict.parseUrl(JMDICT_URL)
+            Jmdict.parseUrl(dictUrl)
         }
     } catch (e: Exception) {
         Log.e(TAG, "download or parsing failed", e)
