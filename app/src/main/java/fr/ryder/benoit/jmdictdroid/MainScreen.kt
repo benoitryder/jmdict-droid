@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -230,6 +232,11 @@ fun SearchMenuIcon(
                 text = { Text("Database") },
                 onClick = { navController.navigate("database") },
                 leadingIcon = { Icon(Icons.Filled.Storage, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("Help") },
+                onClick = { navController.navigate("help") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null) }
             )
         }
     }

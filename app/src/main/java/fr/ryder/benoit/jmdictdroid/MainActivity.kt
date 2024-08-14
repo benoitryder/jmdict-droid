@@ -54,6 +54,9 @@ class MainActivity : ComponentActivity() {
                     composable("database") {
                         DatabaseScreen(navController, jmdictDb)
                     }
+                    composable("help") {
+                        HelpScreen(navController)
+                    }
                 }
             }
         }
