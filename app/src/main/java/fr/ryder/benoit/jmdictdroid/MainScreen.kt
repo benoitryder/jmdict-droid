@@ -37,7 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ParagraphStyle
@@ -63,7 +64,8 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
     var query by remember { mutableStateOf("") }
     var reverse by remember { mutableStateOf(false) }
     var resultText by remember { mutableStateOf<AnnotatedString?>(null) }
-    var resultScroll = rememberScrollState()
+    val resultScroll = rememberScrollState()
+    val searchFocusRequester = remember { FocusRequester() }
 
     // Run search using current query, collect results
     fun searchResults() {
@@ -91,10 +93,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
     // Handle initial query from activity intent
     // Update query and run search on new activity intent
     DisposableEffect(Unit) {
-        val intent = activity?.intent
-        if (intent != null) {
-            searchWithQuery(intentToSearchText(intent))
-        }
+        searchWithQuery(intentToSearchText(activity?.intent))
 
         //TODO
         // - Find a way to switch to the right screen?
@@ -105,6 +104,13 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
         activity?.addOnNewIntentListener(listener)
         onDispose {
             activity?.removeOnNewIntentListener(listener)
+        }
+    }
+
+    // Focus search input on startup started with a search
+    LaunchedEffect(Unit) {
+        if (intentToSearchText(activity?.intent) == null) {
+            searchFocusRequester.requestFocus()
         }
     }
 
@@ -125,6 +131,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
                     onSearch = { searchResults() },
                     onQueryChange = { query = it },
                     onReverseChange = { reverse = it },
+                    focusRequester = searchFocusRequester,
                     navController = navController,
                 )
             }
@@ -163,11 +170,13 @@ fun AppSearchBar(
     onSearch: () -> Unit,
     onQueryChange: (String) -> Unit,
     onReverseChange: (Boolean) -> Unit,
+    focusRequester: FocusRequester,
     navController: NavController,
 ) {
     var expanded = false  //TODO never expand for now
     SearchBar(
         modifier = Modifier
+            .focusRequester(focusRequester)
             // The rounded search bar sticks to the sides by default; add some padding
             // Don't add padding at the top: there is already a visible gap
             .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
