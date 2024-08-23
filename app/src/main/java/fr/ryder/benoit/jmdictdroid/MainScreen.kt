@@ -188,7 +188,7 @@ fun AppSearchBar(
                 onSearch = { onQueryChange(query); onSearch() },
                 expanded = expanded,
                 onExpandedChange = { expanded = it },
-                placeholder = { Text("Translation") },
+                placeholder = { Text("Translate...") },
                 leadingIcon = { SearchMenuIcon(navController = navController) },
                 trailingIcon = { SearchWayToggle(reverse, onChange = onReverseChange) },
             )
