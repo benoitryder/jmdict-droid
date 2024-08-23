@@ -1,0 +1,7 @@
+Search for English definition of Japanese words using kanji, kana or rōmaji. Search for Japanese words from their English definition.
+Basic wildcards are supported, to search for incomplete words, words ending with a specific kanji, etc.
+
+JMdict data is not included in the APK. It must be downloaded from the application first.
+Afterwards, the application is completely standalone and can be used offline.
+
+JMdict is provided by Electronic Dictionaries Research Group. See https://www.edrdg.org/ 
