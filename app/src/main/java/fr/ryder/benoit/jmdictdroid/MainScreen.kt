@@ -96,7 +96,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
         searchWithQuery(intentToSearchText(activity?.intent))
 
         //TODO
-        // - Find a way to switch to the right screen?
+        // - Find a way to switch to the right screen
         // - Set cursor position, make sure the keyboard is hidden, ...
         val listener = Consumer<Intent> {
             searchWithQuery(intentToSearchText(it))
@@ -173,7 +173,7 @@ fun AppSearchBar(
     focusRequester: FocusRequester,
     navController: NavController,
 ) {
-    var expanded = false  //TODO never expand for now
+    var expanded = false  // Never expand for now
     SearchBar(
         modifier = Modifier
             .focusRequester(focusRequester)
@@ -206,7 +206,6 @@ fun SearchWayToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
         checked = checked,
         onCheckedChange = onChange,
     ) {
-        //TODO Use advance icon pack
         if (checked) {
             Icon(Icons.Filled.SwapHoriz, contentDescription = "Japanese to English")
         } else {
