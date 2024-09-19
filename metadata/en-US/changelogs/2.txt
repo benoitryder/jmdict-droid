@@ -1,0 +1,2 @@
+* Make it possible to load JMdict from a file
+* Fix back button from database screen when it's the first screen
