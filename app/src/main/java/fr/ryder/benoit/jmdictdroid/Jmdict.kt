@@ -5,6 +5,7 @@ import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import java.net.HttpURLConnection
+import java.net.MalformedURLException
 import java.net.URL
 import java.util.zip.GZIPInputStream
 
@@ -43,12 +44,6 @@ object Jmdict {
         val gtype: String?,
     )
 
-    // Download and parse JMdict
-    @JvmStatic fun parseUrl(urlString: String): Root {
-        val stream = downloadUrl(urlString) ?: throw RuntimeException("failed to download JMdict: ${urlString}")
-        return parseXmlStream(stream)
-    }
-
     // Parse JMdict from XML content 
     @JvmStatic fun parseXmlStream(inputStream: InputStream): Root {
         inputStream.use {
@@ -82,23 +77,6 @@ object Jmdict {
             val result = readRoot(parser)
             Log.d(TAG, "parsing complete")
             return result
-        }
-    }
-
-    // Download and parse JMdict from a URL
-    @JvmStatic private fun downloadUrl(urlString: String): InputStream? {
-        val url = URL(urlString)
-        return (url.openConnection() as? HttpURLConnection)?.run {
-            requestMethod = "GET"
-            doInput = true
-            // Disable GZip: content is already compressed
-            setRequestProperty("Accept-Encoding", "identity")
-            connect()
-            var stream = inputStream
-            if (contentType == "application/x-gzip") {
-                stream = GZIPInputStream(stream)
-            }
-            stream
         }
     }
 

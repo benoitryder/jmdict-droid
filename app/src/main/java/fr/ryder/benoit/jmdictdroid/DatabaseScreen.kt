@@ -2,7 +2,11 @@
 
 package fr.ryder.benoit.jmdictdroid
 
+import android.content.Context
+import android.net.Uri
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -40,6 +46,10 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.zip.GZIPInputStream
 
 const val JMDICT_URL = "http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz"
 
@@ -69,23 +79,40 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            val context = LocalContext.current
             var statusMessage by remember { mutableStateOf("") }
             var errorMessage by remember { mutableStateOf("") }
             var inProgress by remember { mutableStateOf(false) }
-            var dictUrl by remember { mutableStateOf(JMDICT_URL) }
+            var dictUri by remember { mutableStateOf(JMDICT_URL) }
+            val pickFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
+                if (it != null) {
+                    dictUri = it.toString()
+                }
+            }
             val scope = rememberCoroutineScope()
+
 
             Text(
                 modifier = Modifier.padding(12.dp),
-                text = "Use the button below to create or update the dictionary database from JMdict data. This may take several minutes.",
+                text = "Use the button below to create or update the dictionary database from JMdict data. File can be downloaded from a URL or retrieved locally. The operation may take several minutes.",
             )
 
             TextField(
                 modifier = Modifier.fillMaxWidth().padding(15.dp),
-                value = dictUrl,
-                onValueChange = { dictUrl = it },
-                label = { Text("Dictionary URL") },
+                value = dictUri,
+                onValueChange = { dictUri = it },
+                label = { Text("Dictionary to load") },
                 singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = {
+                        pickFileLauncher.launch(arrayOf("application/gzip", "application/x-gzip"))
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.FileOpen,
+                            contentDescription = "Load file"
+                        )
+                    }
+                },
             )
 
             Button(
@@ -94,12 +121,13 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                 onClick = {
                     inProgress = true
                     scope.launch {
-                        errorMessage = downloadAndUpdateDatabase(jmdictDb, dictUrl) { status -> statusMessage = status }
+                        val uri = Uri.parse(dictUri)
+                        errorMessage = downloadAndUpdateDatabase(context, jmdictDb, uri) { status -> statusMessage = status }
                         inProgress = false
                     }
                 }
             ) {
-                Text("Download and update database")
+                Text("Load and update database")
             }
 
             if (errorMessage.isNotEmpty()) {
@@ -162,16 +190,17 @@ fun JmdictTerms() {
 
 
 // Download and update the database, return an error message, empty on success
-private suspend fun downloadAndUpdateDatabase(db: JmdictDb, dictUrl: String, updateStatus: (String) -> Unit): String {
-    Log.i(TAG, "Download JMdict XML file")
-    updateStatus("Download and parse JMdict...")
+private suspend fun downloadAndUpdateDatabase(context: Context, db: JmdictDb, dictUri: Uri, updateStatus: (String) -> Unit): String {
+    Log.i(TAG, "Load JMdict XML file from ${dictUri}")
+    updateStatus("Load and parse JMdict...")
     val jmdict = try {
         getResultWithContext(Dispatchers.IO) {
-            Jmdict.parseUrl(dictUrl)
+            val stream = openDictInputStreamFromUri(context, dictUri)
+            Jmdict.parseXmlStream(stream)
         }
     } catch (e: Exception) {
-        Log.e(TAG, "download or parsing failed", e)
-        return "Download or parsing failed: ${e}"
+        Log.e(TAG, "loading or parsing failed", e)
+        return "Loading or parsing failed: ${e}"
     }
 
     Log.i(TAG, "Import JMdict data to database (${jmdict.entries.size} entries)")
@@ -200,5 +229,32 @@ private suspend fun <T> getResultWithContext(dispatcher: CoroutineDispatcher, bl
         }
     }
     return result.getOrThrow()
+}
+
+// Get a JMdict stream from a URI
+private fun openDictInputStreamFromUri(context: Context, uri: Uri): InputStream {
+    if (uri.scheme == "http" || uri.scheme == "https") {
+        val url = URL(uri.toString())
+        return openDictInputStreamFromUrl(url) ?: throw RuntimeException("failed to download JMdict: ${uri}")
+    } else {
+        val stream = context.contentResolver.openInputStream(uri)
+        return GZIPInputStream(stream)
+    }
+}
+
+// Get a JMdict stream from a URL
+private fun openDictInputStreamFromUrl(url: URL): InputStream? {
+    return (url.openConnection() as? HttpURLConnection)?.run {
+        requestMethod = "GET"
+        doInput = true
+        // Disable GZip: content is already compressed
+        setRequestProperty("Accept-Encoding", "identity")
+        connect()
+        var stream = inputStream
+        if (contentType == "application/gzip" || contentType == "application/x-gzip") {
+            stream = GZIPInputStream(stream)
+        }
+        stream
+    }
 }
 
