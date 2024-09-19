@@ -63,7 +63,11 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                     Text("Database")
                 },
                 navigationIcon = {
-                    IconButton(onClick = navController::popBackStack) {
+                    IconButton(onClick = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate("main")
+                        }
+                    }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
