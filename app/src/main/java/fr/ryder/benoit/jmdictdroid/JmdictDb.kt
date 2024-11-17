@@ -90,10 +90,10 @@ class JmdictDb(context: Context) {
 
     // Return true if the database is initialized with content
     fun isInitialized(): Boolean {
-        try {
-            return DatabaseUtils.queryNumEntries(db, "gloss") > 0
+        return try {
+            DatabaseUtils.queryNumEntries(db, "gloss") > 0
         } catch (_: SQLiteException) {
-            return false  // table does not exist
+            false  // table does not exist
         }
     }
 
@@ -327,10 +327,10 @@ private fun patternToSql(pattern: String): String {
         .replace('?', '_')
         .replace('？', '_')
         .replace('＿', '_')
-    if (query.all { it != '%' && it != '_' }) {
-        return query.plus('%')
+    return if (query.all { it != '%' && it != '_' }) {
+        query.plus('%')
     } else {
-        return query
+        query
     }
 }
 

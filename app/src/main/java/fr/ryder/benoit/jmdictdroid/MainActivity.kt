@@ -85,11 +85,11 @@ internal fun Context.getComponentActivity(): ComponentActivity? {
 }
 
 internal fun intentToSearchText(intent: Intent?): String? {
-    if (intent == null) {
-        return null
+    return if (intent == null) {
+        null
     } else if (intent.action == Intent.ACTION_SEND) {
-        return intent.getStringExtra(Intent.EXTRA_TEXT)
+        intent.getStringExtra(Intent.EXTRA_TEXT)
     } else {
-        return null
+        null
     }
 }

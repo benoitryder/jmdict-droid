@@ -4,10 +4,6 @@ import android.util.Log
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.MalformedURLException
-import java.net.URL
-import java.util.zip.GZIPInputStream
 
 object Jmdict {
     class Root(
