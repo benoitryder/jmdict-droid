@@ -62,7 +62,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
     val resultColors = themeResultColors()
 
     var query by remember { mutableStateOf("") }
-    var reverse by remember { mutableStateOf(false) }
+    var forceEnglish by remember { mutableStateOf(false) }
     var resultText by remember { mutableStateOf<AnnotatedString?>(null) }
     val resultScroll = rememberScrollState()
     val searchFocusRequester = remember { FocusRequester() }
@@ -72,7 +72,8 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
         val pattern = query.trim()
         var result = emptyList<Jmdict.Entry>()
         if (pattern.isNotEmpty()) {
-            result = jmdictDb.search(pattern, reverse, SEARCH_RESULTS_LIMIT)
+            val patternMode = if (forceEnglish) PatternMode.ENGLISH_TO_JAPANESE else PatternMode.AUTO
+            result = jmdictDb.search(pattern, patternMode, SEARCH_RESULTS_LIMIT)
             Log.d(TAG, "new results: ${result.size}")
         }
         resultText = if (result.isEmpty()) {
@@ -127,10 +128,10 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
             ) {
                 AppSearchBar(
                     query = query,
-                    reverse = reverse,
+                    forceEnglish = forceEnglish,
                     onSearch = { searchResults() },
                     onQueryChange = { query = it },
-                    onReverseChange = { reverse = it },
+                    onForceEnglishChange = { forceEnglish = it },
                     focusRequester = searchFocusRequester,
                     navController = navController,
                 )
@@ -166,10 +167,10 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
 @Composable
 fun AppSearchBar(
     query: String,
-    reverse: Boolean,
+    forceEnglish: Boolean,
     onSearch: () -> Unit,
     onQueryChange: (String) -> Unit,
-    onReverseChange: (Boolean) -> Unit,
+    onForceEnglishChange: (Boolean) -> Unit,
     focusRequester: FocusRequester,
     navController: NavController,
 ) {
@@ -190,7 +191,7 @@ fun AppSearchBar(
                 onExpandedChange = { expanded = it },
                 placeholder = { Text("Translate...") },
                 leadingIcon = { SearchMenuIcon(navController = navController) },
-                trailingIcon = { SearchWayToggle(reverse, onChange = onReverseChange) },
+                trailingIcon = { SearchModeToggle(forceEnglish, onChange = onForceEnglishChange) },
             )
         },
         expanded = expanded,
@@ -201,15 +202,15 @@ fun AppSearchBar(
 }
 
 @Composable
-fun SearchWayToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
+fun SearchModeToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
     FilledIconToggleButton(
         checked = checked,
         onCheckedChange = onChange,
     ) {
         if (checked) {
-            Icon(Icons.Filled.SwapHoriz, contentDescription = "Japanese to English")
+            Icon(Icons.Filled.SwapHoriz, contentDescription = "Auto-detect input language")
         } else {
-            Icon(Icons.Default.SwapHoriz, contentDescription = "English to Japanese")
+            Icon(Icons.Default.SwapHoriz, contentDescription = "Force English to Japanese")
         }
     }
 }

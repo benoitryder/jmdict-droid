@@ -96,14 +96,16 @@ fun HelpContent() {
         modifier = Modifier.padding(12.dp),
         text = buildAnnotatedString {
             appendTitle("Search pattern")
-            append("Both Japanese and rōmaji can be used, but they cannot be mixed. Using rgitōmaji will search entries based on their pronunciation.\n")
+            append("Both Japanese and rōmaji can be used, but they cannot be mixed. Using rōmaji will search entries based on their pronunciation.\n")
             append("The following wildcards can be used, both with Japanese and rōmaji:\n")
             append("\t\t"); appendCode("*"); append(" and "); appendCode("%"); append(" match any number of characters\n")
             append("\t\t"); appendCode("_"); append(" and "); appendCode("?"); append(" match a single character\n")
             append("If no wildcard is used, return all entries starting with the provided pattern.\n")
 
-            appendTitle("Reversed search")
-            append("Use the "); appendInlineContent("iconSwap", "[swap]"); append(" button to toggle between search of Japanese and English words.\n")
+            appendTitle("Search direction")
+            append("Search will attempt to guess if the input is a Japanese word to be translated to English, or the reverse.\n")
+            append("If latin text does not return any result when searched as rōmaji, it will search for an English word.\n")
+            append("Use the "); appendInlineContent("iconReverse", "[reverse]"); append(" button or start the pattern with "); appendCode("/"); append(" to force the search of an English word.\n")
 
             appendTitle("Rōmaji conversion")
             append("Conversion is based on Hepburn romanization.\n")
@@ -114,7 +116,7 @@ fun HelpContent() {
             append("Apostrophes are not used.\n")
         },
 		inlineContent = mapOf(
-			Pair("iconSwap", InlineTextContent(
+			Pair("iconReverse", InlineTextContent(
 				Placeholder(width = 12.sp, height = 12.sp, placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter)
 			) {
 				Icon(Icons.Filled.SwapHoriz, "swap")

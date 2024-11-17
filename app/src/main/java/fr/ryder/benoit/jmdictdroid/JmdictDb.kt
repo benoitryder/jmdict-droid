@@ -73,6 +73,13 @@ private fun openJmdictDatabase(context: Context): SQLiteDatabase {
 
 private typealias ImportProgress = (String) -> Unit
 
+enum class PatternMode {
+  AUTO,
+  JAPANESE_TO_ENGLISH,
+  ENGLISH_TO_JAPANESE,
+}
+
+
 /**
  * Manage the JMdict database
  *
@@ -185,17 +192,49 @@ class JmdictDb(context: Context) {
     }
 
     // Search in database, yield entries
-    fun search(pattern: String, reverse: Boolean, limit: Int): List<Jmdict.Entry> {
-        Log.d(TAG, "new search with pattern '${pattern}', reverse ${reverse}, limit ${limit}")
+    fun search(pattern: String, mode: PatternMode, limit: Int): List<Jmdict.Entry> {
+        Log.d(TAG, "new search with pattern '${pattern}', mode ${mode}, limit ${limit}")
 
-        val sqlPattern = patternToSql(pattern)
+        // Guess "actual" mode from pattern
+        // Keep value set to `AUTO` if not sure yet
+        var updatedPattern = pattern
+        var retryReverse = false
+        val reverse = when (mode) {
+            PatternMode.JAPANESE_TO_ENGLISH -> false
+            PatternMode.ENGLISH_TO_JAPANESE -> true
+            PatternMode.AUTO -> {
+                if (pattern.startsWith("/")) {
+                    updatedPattern = pattern.substring(1)
+                    true
+                } else if (!isLatinText(pattern)) {
+                    false
+                } else {
+                    retryReverse = true
+                    false
+                }
+            }
+        }
+        assert(!(reverse && retryReverse))
+
+        val sqlPattern = patternToSql(updatedPattern)
         Log.d(TAG, "translated SQL pattern: '${sqlPattern}")
 
+        var entryIds = searchSqlPattern(sqlPattern, reverse, limit)
+        if (mode == PatternMode.AUTO && entryIds.isEmpty()) {
+            Log.d(TAG, "re-try auto pattern in reverse")
+            entryIds = searchSqlPattern(sqlPattern, true, limit)
+        }
+
+        return collectEntries(entryIds)
+    }
+
+    // Search for an already translated SQL pattern, return a list of matching entry IDs
+    private fun searchSqlPattern(sqlPattern: String, reverse: Boolean, limit: Int): List<Long> {
         // SQLiteDatabase.rawQuery() can bind only string values; limit has to be formatted here
         val query = if (reverse) {
             // English to Japanese
             "SELECT DISTINCT entry_id, length(text) AS n FROM gloss WHERE text LIKE ?1 ORDER BY n LIMIT ${limit}"
-        } else if (sqlPattern.all { it.code < 256 }) {
+        } else if (isLatinText(sqlPattern)) {
             // Romaji to English
             "SELECT DISTINCT entry_id, length(romaji) AS n FROM reading WHERE romaji LIKE ?1 ORDER BY n LIMIT ${limit}"
         } else {
@@ -212,8 +251,8 @@ class JmdictDb(context: Context) {
                 entryIds.add(cursor.getLong(0))
             }
         }
-        Log.d(TAG, "query results: ${entryIds.size}")
-        return collectEntries(entryIds)
+
+        return entryIds
     }
 
     private fun collectEntries(entryIds: List<Long>): List<Jmdict.Entry> {

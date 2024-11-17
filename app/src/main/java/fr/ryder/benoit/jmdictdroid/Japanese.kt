@@ -1,6 +1,23 @@
 package fr.ryder.benoit.jmdictdroid
 
-private object Converter {
+
+// Return `true` if a string contains only Latin characters
+fun isLatinText(text: String): Boolean {
+    return text.codePoints().allMatch { isLatinChar(it) }
+}
+
+// Return `true` if a character looks Latin
+//
+// But it should not cause conflict with character actually used with English,
+// including emojis. Check does not check specifically for Japanese.
+fun isLatinChar(code: Int): Boolean {
+    return !(code in  0x3000.. 0x9FFF  // kanas, punctuation, CJK
+        || code in  0xF900.. 0xFFEF  // half-width kanas, more CJK
+        || code in 0x20000..0x3FFFF  // more CJK
+    )
+}
+
+private object RomajiConverter {
     // Static tables for replacement
     // Item order is important
     val CONVERSION_TABLE: LinkedHashMap<String, String> = linkedMapOf(
@@ -96,12 +113,12 @@ private object Converter {
 fun kanaToRomaji(text: String): String {
     // Note: it's better to run replacements that reduce the string length and size first 
     return text
-        .replace(Converter.RE) { m -> Converter.CONVERSION_TABLE[m.value]!! }
-        .replace(Converter.RE_CONSONANT, "$1$1")
-        .replace(Converter.RE_VOWEL, "$1$1")
-        .replace(Converter.RE_DASH, "-")
-        .replace(Converter.RE_TSU, "-tsu")
+        .replace(RomajiConverter.RE) { m -> RomajiConverter.CONVERSION_TABLE[m.value]!! }
+        .replace(RomajiConverter.RE_CONSONANT, "$1$1")
+        .replace(RomajiConverter.RE_VOWEL, "$1$1")
+        .replace(RomajiConverter.RE_DASH, "-")
+        .replace(RomajiConverter.RE_TSU, "-tsu")
         // Replace full-width ASCII characters
-        .replace(Converter.RE_FW_ASCII) { m -> (m.value[0] - 0xfee0).toString() }
+        .replace(RomajiConverter.RE_FW_ASCII) { m -> (m.value[0] - 0xfee0).toString() }
 }
 
