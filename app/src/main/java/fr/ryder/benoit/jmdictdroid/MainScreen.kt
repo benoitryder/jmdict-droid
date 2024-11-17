@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -61,7 +64,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
     val activity = LocalContext.current.getComponentActivity()
     val resultColors = themeResultColors()
 
-    var query by remember { mutableStateOf("") }
+    val queryState = rememberTextFieldState()
     var forceEnglish by remember { mutableStateOf(false) }
     var resultText by remember { mutableStateOf<AnnotatedString?>(null) }
     val resultScroll = rememberScrollState()
@@ -69,7 +72,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
 
     // Run search using current query, collect results
     fun searchResults() {
-        val pattern = query.trim()
+        val pattern = queryState.text.trim().toString()
         var result = emptyList<Jmdict.Entry>()
         if (pattern.isNotEmpty()) {
             val patternMode = if (forceEnglish) PatternMode.ENGLISH_TO_JAPANESE else PatternMode.AUTO
@@ -83,10 +86,10 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
         }
     }
 
-    // Run a search with given query if not null
+    // Run a search with given query if not null, set cursor at the end
     fun searchWithQuery(newQuery: String?) {
         if (newQuery != null) {
-            query = newQuery
+            queryState.setTextAndPlaceCursorAtEnd(newQuery)
             searchResults()
         }
     }
@@ -127,10 +130,9 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
                 color = MaterialTheme.colorScheme.primaryContainer,
             ) {
                 AppSearchBar(
-                    query = query,
+                    queryState = queryState,
                     forceEnglish = forceEnglish,
                     onSearch = { searchResults() },
-                    onQueryChange = { query = it },
                     onForceEnglishChange = { forceEnglish = it },
                     focusRequester = searchFocusRequester,
                     navController = navController,
@@ -166,10 +168,9 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
 
 @Composable
 fun AppSearchBar(
-    query: String,
+    queryState: TextFieldState,
     forceEnglish: Boolean,
     onSearch: () -> Unit,
-    onQueryChange: (String) -> Unit,
     onForceEnglishChange: (Boolean) -> Unit,
     focusRequester: FocusRequester,
     navController: NavController,
@@ -184,9 +185,8 @@ fun AppSearchBar(
             .fillMaxWidth(),
         inputField = {
             SearchBarDefaults.InputField(
-                query = query,
-                onQueryChange = onQueryChange,
-                onSearch = { onQueryChange(query); onSearch() },
+                state = queryState,
+                onSearch = { onSearch() },
                 expanded = expanded,
                 onExpandedChange = { expanded = it },
                 placeholder = { Text("Translate...") },
