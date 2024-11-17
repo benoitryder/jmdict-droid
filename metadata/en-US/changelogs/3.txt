@@ -1,0 +1,5 @@
+* Attempt to detect translation direction by default, instead of always searching for Japanese
+* The toggle button now forces search of an English word
+* Force search of an English word if the pattern starts with "/"
+* Move cursor at the end of the query after using the "share" intent
+* Allow to cancel text selection by touching empty space at the end of results
