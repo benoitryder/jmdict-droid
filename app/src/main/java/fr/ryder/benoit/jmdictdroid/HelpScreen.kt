@@ -105,7 +105,7 @@ fun HelpContent() {
             appendTitle("Search direction")
             append("Search will attempt to guess if the input is a Japanese word to be translated to English, or the reverse.\n")
             append("If latin text does not return any result when searched as rōmaji, it will search for an English word.\n")
-            append("Use the "); appendInlineContent("iconReverse", "[reverse]"); append(" button or start the pattern with "); appendCode("/"); append(" to force the search of an English word.\n")
+            append("Use the "); appendInlineContent("iconReverse", "[reverse]"); append(" button or start the pattern with "); appendCode("/"); append(" to force the search of an English word when latin text is input.\n")
 
             appendTitle("Rōmaji conversion")
             append("Conversion is based on Hepburn romanization.\n")

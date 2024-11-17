@@ -76,7 +76,16 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
         val pattern = queryState.text.trim().toString()
         var result = emptyList<Jmdict.Entry>()
         if (pattern.isNotEmpty()) {
-            val patternMode = if (forceEnglish) PatternMode.ENGLISH_TO_JAPANESE else PatternMode.AUTO
+            val patternMode = if (forceEnglish) {
+                if (isLatinText(pattern)) {
+                    PatternMode.ENGLISH_TO_JAPANESE
+                } else {
+                    Log.d(TAG, "ignore 'force English' toggle because text is not latin")
+                    PatternMode.JAPANESE_TO_ENGLISH
+                }
+            } else {
+                PatternMode.AUTO
+            }
             result = jmdictDb.search(pattern, patternMode, SEARCH_RESULTS_LIMIT)
             Log.d(TAG, "new results: ${result.size}")
         }
