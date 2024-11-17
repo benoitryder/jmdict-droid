@@ -216,6 +216,10 @@ class JmdictDb(context: Context) {
         }
         assert(!(reverse && retryReverse))
 
+        if (reverse && pattern.startsWith("/")) {
+            updatedPattern = pattern.substring(1)
+        }
+
         val sqlPattern = patternToSql(updatedPattern)
         Log.d(TAG, "translated SQL pattern: '${sqlPattern}")
 
