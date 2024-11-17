@@ -1,12 +1,13 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.compose.compiler)
     alias(libs.plugins.jetbrains.kotlin.android)
     kotlin("plugin.serialization") version "1.9.22"
 }
 
 android {
     namespace = "fr.ryder.benoit.jmdictdroid"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "fr.ryder.benoit.jmdictdroid"
