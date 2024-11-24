@@ -63,11 +63,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        Log.i(TAG,"new intent: ${intent.action}")
-    }
 }
 
 // Helper method to get activity in Compose
