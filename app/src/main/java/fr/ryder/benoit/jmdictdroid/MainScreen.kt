@@ -97,7 +97,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
     }
 
     // Run a search with given query if not null, reset cursor and toggle flag
-    fun searchExternaluery(newQuery: String?) {
+    fun searchExternalQuery(newQuery: String?) {
         if (newQuery != null) {
             forceEnglish = false
             queryState.setTextAndPlaceCursorAtEnd(newQuery)
@@ -108,13 +108,13 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
     // Handle initial query from activity intent
     // Update query and run search on new activity intent
     DisposableEffect(Unit) {
-        searchExternaluery(intentToSearchText(activity?.intent))
+        searchExternalQuery(intentToSearchText(activity?.intent))
 
         //TODO
         // - Find a way to switch to the right screen
         // - Set cursor position, make sure the keyboard is hidden, ...
         val listener = Consumer<Intent> {
-            searchExternaluery(intentToSearchText(it))
+            searchExternalQuery(intentToSearchText(it))
         }
         activity?.addOnNewIntentListener(listener)
         onDispose {
