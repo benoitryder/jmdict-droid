@@ -114,6 +114,9 @@ fun HelpContent() {
             append("\t\tー repeats the previous vowel (ロー is "); appendEmph("roo"); append(")\n")
             append("\t\tう/い are converted to "); appendEmph("u"); append("/"); appendEmph("i"); append("\n")
             append("Apostrophes are not used.\n")
+
+            appendTitle("Interface")
+            append("Double-tap the result area to quickly refocus the search input and open the keyboard.\n")
         },
 		inlineContent = mapOf(
 			Pair("iconReverse", InlineTextContent(

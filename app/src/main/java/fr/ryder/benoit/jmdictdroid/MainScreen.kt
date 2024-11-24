@@ -4,6 +4,9 @@ package fr.ryder.benoit.jmdictdroid
 
 import android.content.Intent
 import android.util.Log
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,7 +47,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.isOutOfBounds
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
@@ -53,6 +64,8 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastAll
+import androidx.compose.ui.util.fastAny
 import androidx.core.util.Consumer
 import androidx.navigation.NavController
 import fr.ryder.benoit.jmdictdroid.ui.theme.ResultColors
@@ -60,9 +73,11 @@ import fr.ryder.benoit.jmdictdroid.ui.theme.themeResultColors
 
 private const val SEARCH_RESULTS_LIMIT = 50
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
     val activity = LocalContext.current.getComponentActivity()
+    val keyboardController = LocalSoftwareKeyboardController.current
     val resultColors = themeResultColors()
 
     val queryState = rememberTextFieldState()
@@ -152,13 +167,22 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
         },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
+            var inputModifier = Modifier
+                .pointerInput(Unit) {
+                    detectDoubleTapWithoutConsume {
+                        searchFocusRequester.requestFocus()
+                        // Display the keyboard even if the search already has the focus
+                        keyboardController?.show()
+                    }
+                }
             if (resultText != null) {
                 SelectionContainer {
                     Text(
                         modifier = Modifier
                             .padding(8.dp)
                             .fillMaxHeight()
-                            .verticalScroll(resultScroll),
+                            .verticalScroll(resultScroll)
+                            .then(inputModifier),
                         text = resultText!!,
                     )
                 }
@@ -167,11 +191,13 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
                     modifier = Modifier
                         .padding(vertical = 24.dp)
                         .fillMaxWidth()
-                        .wrapContentSize(Alignment.Center),
+                        .fillMaxHeight()
+                        .wrapContentSize(Alignment.Center)
+                        .then(inputModifier),
                     color = MaterialTheme.colorScheme.outlineVariant,
                     fontStyle = FontStyle.Italic,
                     fontSize = MaterialTheme.typography.bodyLarge.fontSize.times(1.5),
-                    text = "no results"
+                    text = "no results",
                 )
             }
         }
@@ -188,6 +214,7 @@ fun AppSearchBar(
     navController: NavController,
 ) {
     var expanded = false  // Never expand for now
+
     SearchBar(
         modifier = Modifier
             .focusRequester(focusRequester)
@@ -329,4 +356,62 @@ fun buildResultText(entries: List<Jmdict.Entry>, colors: ResultColors): Annotate
         }
     }
 }
+
+
+// PointerInputScope.detectTapGestures(
+
+
+// Detect a double tap without consuming the initial tap
+//
+// This is similar to `PointerInputScope.detectTapGestures()` but does not
+// consume the initial single tap. It makes it suitable for use within a
+// `SelectionContainer`, which does not use double taps itself.
+internal suspend fun PointerInputScope.detectDoubleTapWithoutConsume(onDoubleTap: () -> Unit) {
+    awaitEachGesture {
+        awaitFirstDown()
+        val firstUp = awaitTapUpOrCancel()
+        if (firstUp != null) {
+            val secondDown = awaitDoubleTapDownOrCancel(firstUp)
+            if (secondDown != null) {
+                val secondUp = awaitTapUpOrCancel()
+                if (secondUp != null) {
+                    secondUp.consume()
+                    onDoubleTap()
+                }
+            }
+        }
+    }
+}
+
+
+// Wait for a "tap up". Cancel if pointer moved too much or event has been consumed.
+internal suspend fun AwaitPointerEventScope.awaitTapUpOrCancel(): PointerInputChange? {
+    while (true) {
+        val event = awaitPointerEvent()
+        if (event.changes.fastAny { it.isConsumed || it.isOutOfBounds(size, extendedTouchPadding) }) {
+            return null  // canceled
+        }
+        if (event.changes.fastAll { it.changedToUp() }) {
+            return event.changes[0]
+        }
+        // Cancel if event has been consumed later on the stack (e.g. due to position)
+        val laterEvent = awaitPointerEvent(PointerEventPass.Final)
+        if (laterEvent.changes.fastAny { it.isConsumed }) {
+            return null
+        }
+    }
+}
+
+
+// Wait for a "tap down" with a "double tap" timeout
+internal suspend fun AwaitPointerEventScope.awaitDoubleTapDownOrCancel(firstUp: PointerInputChange): PointerInputChange? =
+    withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+        // Wait for a minimum delay between first "up" and second "down"
+        val minUptime = firstUp.uptimeMillis + viewConfiguration.doubleTapMinTimeMillis
+        var change: PointerInputChange
+        do {
+            change = awaitFirstDown()
+        } while (change.uptimeMillis < minUptime)
+        change
+    }
 
