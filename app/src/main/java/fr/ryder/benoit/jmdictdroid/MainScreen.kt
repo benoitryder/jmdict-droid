@@ -2,7 +2,6 @@
 
 package fr.ryder.benoit.jmdictdroid
 
-import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -37,11 +36,11 @@ import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +53,6 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ParagraphStyle
@@ -66,7 +64,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
-import androidx.core.util.Consumer
 import androidx.navigation.NavController
 import fr.ryder.benoit.jmdictdroid.ui.theme.ResultColors
 import fr.ryder.benoit.jmdictdroid.ui.theme.themeResultColors
@@ -75,11 +72,11 @@ private const val SEARCH_RESULTS_LIMIT = 50
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
-    val activity = LocalContext.current.getComponentActivity()
+fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: String) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val resultColors = themeResultColors()
 
+    val currentInitialQuery by rememberUpdatedState(initialQuery)
     val queryState = rememberTextFieldState()
     var forceEnglish by remember { mutableStateOf(false) }
     var resultText by remember { mutableStateOf<AnnotatedString?>(null) }
@@ -111,36 +108,20 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb) {
         }
     }
 
-    // Run a search with given query if not null, reset cursor and toggle flag
-    fun searchExternalQuery(newQuery: String?) {
-        if (newQuery != null) {
-            forceEnglish = false
-            queryState.setTextAndPlaceCursorAtEnd(newQuery)
-            searchResults()
-        }
-    }
+    // Handle initial or new query, set from intent, or empty at startup
+    LaunchedEffect(currentInitialQuery) {
+        Log.d(TAG, "initial query changed: ${initialQuery}")
 
-    // Handle initial query from activity intent
-    // Update query and run search on new activity intent
-    DisposableEffect(Unit) {
-        searchExternalQuery(intentToSearchText(activity?.intent))
-
-        //TODO
-        // - Find a way to switch to the right screen
-        // - Set cursor position, make sure the keyboard is hidden, ...
-        val listener = Consumer<Intent> {
-            searchExternalQuery(intentToSearchText(it))
-        }
-        activity?.addOnNewIntentListener(listener)
-        onDispose {
-            activity?.removeOnNewIntentListener(listener)
-        }
-    }
-
-    // Focus search input on startup started with a search
-    LaunchedEffect(Unit) {
-        if (intentToSearchText(activity?.intent) == null) {
+        // If the query is empty, request focus to start typing
+        // Otherwise, hide the keyboard to free more space for the results
+        if (initialQuery == "") {
             searchFocusRequester.requestFocus()
+        } else {
+            forceEnglish = false
+            queryState.setTextAndPlaceCursorAtEnd(initialQuery)
+            searchResults()
+            // Requesting focus then hiding the keyboard would be better, but it doesn't work as expected
+            keyboardController?.hide()
         }
     }
 

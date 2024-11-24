@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -16,8 +15,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.util.Consumer
+import androidx.navigation.NavOptions
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -49,9 +53,31 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppMaterialTheme {
                 val navController = rememberNavController()
+                var initialQuery = remember { mutableStateOf(intentToSearchText(intent) ?: "") }
+
+                DisposableEffect(Unit) {
+                    val listener = Consumer<Intent> {
+                        val newQuery = intentToSearchText(it)
+                        if (newQuery != null) {
+                            initialQuery.value = newQuery
+                            navController.navigate(
+                                route = "main",
+                                navOptions = NavOptions.Builder()
+                                    .setLaunchSingleTop(true)
+                                    .setPopUpTo("main", false)
+                                    .build(),
+                            )
+                        }
+                    }
+                    addOnNewIntentListener(listener)
+                    onDispose {
+                        removeOnNewIntentListener(listener)
+                    }
+                }
+
                 NavHost(navController = navController, startDestination = startDestination) {
                     composable("main") {
-                        MainScreen(navController, jmdictDb)
+                        MainScreen(navController, jmdictDb, initialQuery.value)
                     }
                     composable("database") {
                         DatabaseScreen(navController, jmdictDb)
