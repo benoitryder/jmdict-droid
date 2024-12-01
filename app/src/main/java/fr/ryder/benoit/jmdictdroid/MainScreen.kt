@@ -6,26 +6,37 @@ import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,14 +55,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
@@ -62,15 +70,17 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.util.fastAll
-import androidx.compose.ui.util.fastAny
 import androidx.navigation.NavController
 import fr.ryder.benoit.jmdictdroid.ui.theme.ResultColors
 import fr.ryder.benoit.jmdictdroid.ui.theme.themeResultColors
 
 private const val SEARCH_RESULTS_LIMIT = 50
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(
+    ExperimentalFoundationApi::class,
+    ExperimentalLayoutApi::class,
+    ExperimentalMaterial3ExpressiveApi::class,
+)
 @Composable
 fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: String) {
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -82,6 +92,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
     var resultText by remember { mutableStateOf<AnnotatedString?>(null) }
     val resultScroll = rememberScrollState()
     val searchFocusRequester = remember { FocusRequester() }
+    var bottomBarVisible by remember { mutableStateOf(false) }
 
     // Run search using current query, collect results
     fun searchResults() {
@@ -106,6 +117,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
         } else {
             buildResultText(entries = result, colors = resultColors)
         }
+        bottomBarVisible = false
     }
 
     // Handle initial or new query, set from intent, or empty at startup
@@ -130,10 +142,32 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
         resultScroll.scrollTo(0)
     }
 
+    // Hide bottom bar whenever the IME state changes
+    LaunchedEffect(WindowInsets.isImeVisible) {
+        bottomBarVisible = false
+    }
+
+    // Helper to let the user type a search
+    fun focusSearchWithKeyboard() {
+        searchFocusRequester.requestFocus()
+        keyboardController?.show()
+        bottomBarVisible = false
+    }
+
     Scaffold(
         topBar = {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(bottomBarVisible) {
+                        if (bottomBarVisible) {
+                            // Same handler in result box
+                            awaitEachGesture {
+                                awaitFirstDown(pass = PointerEventPass.Initial)
+                                bottomBarVisible = false
+                            }
+                        }
+                    },
                 color = MaterialTheme.colorScheme.primaryContainer,
             ) {
                 AppSearchBar(
@@ -146,24 +180,70 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
                 )
             }
         },
+        bottomBar = {
+            if (bottomBarVisible) {
+                BottomAppBar(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    IconButton(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        onClick = {
+                            queryState.clearText()
+                            focusSearchWithKeyboard()
+                        },
+                    ) {
+                        Icon(Icons.Filled.Clear, contentDescription = "New search")
+                    }
+                    IconButton(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        onClick = { focusSearchWithKeyboard() },
+                    ) {
+                        Icon(Icons.Filled.Keyboard, contentDescription = "Edit search")
+                    }
+                    // Placeholder, does nothing for now
+                    Icon(
+                        Icons.Filled.Settings,
+                        contentDescription = "empty",
+                        modifier = Modifier.alpha(0f).fillMaxWidth().weight(1f),
+                    )
+                }
+            }
+        },
     ) { innerPadding ->
-        Box(Modifier.fillMaxSize().padding(innerPadding)) {
-            var inputModifier = Modifier
-                .pointerInput(Unit) {
-                    detectDoubleTapWithoutConsume {
-                        searchFocusRequester.requestFocus()
-                        // Display the keyboard even if the search already has the focus
-                        keyboardController?.show()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .pointerInput(bottomBarVisible) {
+                    // If the bottom bar is visible, hide it on any touch (including scrolling).
+                    // Otherwise, display the bottom bar on a simple touch.
+                    // Caveats
+                    // - Hiding the bottom has to be handled on both the result text and the top
+                    //   bar, because there is no easy way to handle all touches except those on the
+                    //   bottom bar.
+                    // - Touching when a selection is active should not show/hide the bottom bar,
+                    //   but there is now way to get access to the selection state.
+                    if (bottomBarVisible) {
+                        // Same handler in topBar
+                        awaitEachGesture {
+                            awaitFirstDown(pass = PointerEventPass.Initial)
+                            bottomBarVisible = false
+                        }
+                    } else {
+                        detectTapWithoutConsume {
+                            bottomBarVisible = true
+                        }
                     }
                 }
+    ) {
             if (resultText != null) {
-                SelectionContainer {
+                SelectionContainer(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .verticalScroll(resultScroll)
+                ) {
                     Text(
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .fillMaxHeight()
-                            .verticalScroll(resultScroll)
-                            .then(inputModifier),
+                        modifier = Modifier.padding(8.dp),
                         text = resultText!!,
                     )
                 }
@@ -173,8 +253,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
                         .padding(vertical = 24.dp)
                         .fillMaxWidth()
                         .fillMaxHeight()
-                        .wrapContentSize(Alignment.Center)
-                        .then(inputModifier),
+                        .wrapContentSize(Alignment.Center),
                     color = MaterialTheme.colorScheme.outlineVariant,
                     fontStyle = FontStyle.Italic,
                     fontSize = MaterialTheme.typography.bodyLarge.fontSize.times(1.5),
@@ -339,60 +418,17 @@ fun buildResultText(entries: List<Jmdict.Entry>, colors: ResultColors): Annotate
 }
 
 
-// PointerInputScope.detectTapGestures(
-
-
-// Detect a double tap without consuming the initial tap
+// Detect a tap without consuming it
 //
 // This is similar to `PointerInputScope.detectTapGestures()` but does not
-// consume the initial single tap. It makes it suitable for use within a
-// `SelectionContainer`, which does not use double taps itself.
-internal suspend fun PointerInputScope.detectDoubleTapWithoutConsume(onDoubleTap: () -> Unit) {
+// consume the tap. It makes it suitable for use within a `SelectionContainer`.
+internal suspend fun PointerInputScope.detectTapWithoutConsume(onTap: () -> Unit) {
     awaitEachGesture {
         awaitFirstDown()
-        val firstUp = awaitTapUpOrCancel()
+        val firstUp = waitForUpOrCancellation()
         if (firstUp != null) {
-            val secondDown = awaitDoubleTapDownOrCancel(firstUp)
-            if (secondDown != null) {
-                val secondUp = awaitTapUpOrCancel()
-                if (secondUp != null) {
-                    secondUp.consume()
-                    onDoubleTap()
-                }
-            }
+            onTap()
         }
     }
 }
-
-
-// Wait for a "tap up". Cancel if pointer moved too much or event has been consumed.
-internal suspend fun AwaitPointerEventScope.awaitTapUpOrCancel(): PointerInputChange? {
-    while (true) {
-        val event = awaitPointerEvent()
-        if (event.changes.fastAny { it.isConsumed || it.isOutOfBounds(size, extendedTouchPadding) }) {
-            return null  // canceled
-        }
-        if (event.changes.fastAll { it.changedToUp() }) {
-            return event.changes[0]
-        }
-        // Cancel if event has been consumed later on the stack (e.g. due to position)
-        val laterEvent = awaitPointerEvent(PointerEventPass.Final)
-        if (laterEvent.changes.fastAny { it.isConsumed }) {
-            return null
-        }
-    }
-}
-
-
-// Wait for a "tap down" with a "double tap" timeout
-internal suspend fun AwaitPointerEventScope.awaitDoubleTapDownOrCancel(firstUp: PointerInputChange): PointerInputChange? =
-    withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
-        // Wait for a minimum delay between first "up" and second "down"
-        val minUptime = firstUp.uptimeMillis + viewConfiguration.doubleTapMinTimeMillis
-        var change: PointerInputChange
-        do {
-            change = awaitFirstDown()
-        } while (change.uptimeMillis < minUptime)
-        change
-    }
 
