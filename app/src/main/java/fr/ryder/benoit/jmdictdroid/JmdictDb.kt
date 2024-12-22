@@ -249,7 +249,6 @@ class JmdictDb(context: Context) {
 
         // Note: because of the extra field needed for the UNION, there could be duplicates
         val entryIds = arrayListOf<Long>()
-        //db.rawQuery("SELECT DISTINCT entry_id, length(romaji) AS n FROM reading WHERE romaji LIKE 'sato%' ORDER BY n LIMIT 20", arrayOf()).use { cursor ->
         db.rawQuery(query, arrayOf(sqlPattern)).use { cursor ->
             while (cursor.moveToNext()) {
                 entryIds.add(cursor.getLong(0))
