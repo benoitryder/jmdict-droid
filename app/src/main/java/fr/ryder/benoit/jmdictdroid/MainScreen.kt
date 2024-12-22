@@ -74,7 +74,7 @@ import androidx.navigation.NavController
 import fr.ryder.benoit.jmdictdroid.ui.theme.ResultColors
 import fr.ryder.benoit.jmdictdroid.ui.theme.themeResultColors
 
-private const val SEARCH_RESULTS_LIMIT = 50
+private const val SEARCH_RESULTS_LIMIT = 100
 
 @OptIn(
     ExperimentalFoundationApi::class,
