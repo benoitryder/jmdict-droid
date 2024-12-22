@@ -17,13 +17,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Clear
@@ -62,16 +61,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.ParagraphStyle
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import fr.ryder.benoit.jmdictdroid.ui.theme.ResultColors
 import fr.ryder.benoit.jmdictdroid.ui.theme.themeResultColors
 
 private const val SEARCH_RESULTS_LIMIT = 100
@@ -84,13 +76,14 @@ private const val SEARCH_RESULTS_LIMIT = 100
 @Composable
 fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: String) {
     val keyboardController = LocalSoftwareKeyboardController.current
-    val resultColors = themeResultColors()
+    val resultStyles = ResultStyles(themeResultColors())
 
     val currentInitialQuery by rememberUpdatedState(initialQuery)
     val queryState = rememberTextFieldState()
     var forceEnglish by remember { mutableStateOf(false) }
-    var resultText by remember { mutableStateOf<AnnotatedString?>(null) }
-    val resultScroll = rememberScrollState()
+    // The result list is always fully replaced, mutableStateListOf() is not needed
+    var resultListItems by remember { mutableStateOf(emptyList<Jmdict.Entry>()) }
+    val resultListState = rememberLazyListState()
     val searchFocusRequester = remember { FocusRequester() }
     var bottomBarVisible by remember { mutableStateOf(false) }
 
@@ -112,11 +105,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
             result = jmdictDb.search(pattern, patternMode, SEARCH_RESULTS_LIMIT)
             Log.d(TAG, "new results: ${result.size}")
         }
-        resultText = if (result.isEmpty()) {
-            null
-        } else {
-            buildResultText(entries = result, colors = resultColors)
-        }
+        resultListItems = result
         bottomBarVisible = false
     }
 
@@ -138,8 +127,8 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
     }
 
     // Reset scroll when result is updated
-    LaunchedEffect(resultText) {
-        resultScroll.scrollTo(0)
+    LaunchedEffect(resultListItems) {
+        resultListState.scrollToItem(0)
     }
 
     // Hide bottom bar whenever the IME state changes
@@ -236,16 +225,9 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
                     }
                 }
     ) {
-            if (resultText != null) {
-                SelectionContainer(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .verticalScroll(resultScroll)
-                ) {
-                    Text(
-                        modifier = Modifier.padding(8.dp),
-                        text = resultText!!,
-                    )
+            if (resultListItems.isNotEmpty()) {
+                SelectionContainer {
+                    ResultList(resultListItems, resultListState, resultStyles)
                 }
             } else {
                 Text(
@@ -335,84 +317,6 @@ fun SearchMenuIcon(
                 onClick = { navController.navigate("help") },
                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null) }
             )
-        }
-    }
-}
-
-fun buildResultText(entries: List<Jmdict.Entry>, colors: ResultColors): AnnotatedString {
-    val defaultStyle = SpanStyle(fontSize = 16.sp)
-    val japStyle = SpanStyle(color = colors.jap, fontSize = 20.sp)
-    val senseNumStyle = SpanStyle(color = colors.senseNum)
-    val sensePosStyle = SpanStyle(color = colors.sensePos)
-    val senseAttrStyle = SpanStyle(color = colors.senseAttr)
-    val senseInfoStyle = SpanStyle(fontStyle = FontStyle.Italic)
-    val glossTypeStyle = SpanStyle(color = colors.glossType)
-
-    return buildAnnotatedString {
-        withStyle(defaultStyle) {
-            for (entry in entries) {
-                // Japanese text: kanji then reading
-                withStyle(japStyle) {
-                    if (entry.kanjis.isNotEmpty()) {
-                        append(entry.kanjis.joinToString(", ") { it.text })
-                        append(" / ")
-                    }
-                    append(entry.readings.joinToString(", ") { it.text })
-                    append("\n")
-                }
-
-                // Senses, one per line
-                for ((iSense, sense) in entry.senses.withIndex()) {
-                    // Sense number
-                    withStyle(senseNumStyle) {
-                        append("${iSense + 1}) ")
-                    }
-
-                    // Part of speech
-                    if (sense.partOfSpeech.isNotEmpty()) {
-                        withStyle(sensePosStyle) {
-                            append(sense.partOfSpeech.joinToString(","))
-                            append(" ")
-                        }
-                    }
-
-                    // Attributes
-                    if (sense.fields.isNotEmpty() || sense.miscs.isNotEmpty()) {
-                        withStyle(senseAttrStyle) {
-                            append("[")
-                            append((sense.fields.asSequence() + sense.miscs.asSequence()).joinToString(","))
-                            append("] ")
-                        }
-                    }
-
-                    // Informations
-                    if (sense.infos.isNotEmpty()) {
-                        withStyle(senseInfoStyle) {
-                            append("(")
-                            append(sense.infos.joinToString("; "))
-                            append(") ")
-                        }
-                    }
-
-                    // Glosses
-                    for ((iGloss, gloss) in sense.glosses.withIndex()) {
-                        if (iGloss != 0) {
-                            append("; ")
-                        }
-                        if (gloss.gtype != null) {
-                            withStyle(glossTypeStyle) {
-                                append("(${gloss.gtype}) ")
-                            }
-                        }
-                        append(gloss.text)
-                    }
-                    append("\n")
-                }
-
-                // Change style of previous line break, to have a nice separator
-                addStyle(ParagraphStyle(lineHeight = 1.sp), start = length - 1, end = length)
-                addStyle(SpanStyle(fontSize = 9.sp), start = length - 1, end = length)
-            }
         }
     }
 }

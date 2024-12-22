@@ -2,9 +2,6 @@
 
 package fr.ryder.benoit.jmdictdroid
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -89,20 +86,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
-
-// Helper method to get activity in Compose
-internal fun Context.getComponentActivity(): ComponentActivity? {
-    var context = this
-    while (context is ContextWrapper) {
-        if (context is ComponentActivity) {
-            return context
-        } else if (context is Activity) {
-            return null  // should not happen
-        }
-        context = context.baseContext
-    }
-    return null
 }
 
 internal fun intentToSearchText(intent: Intent?): String? {
