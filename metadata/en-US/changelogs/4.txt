@@ -1,0 +1,3 @@
+* Ignore the "force English" toggle when pattern contains Japanese
+* Always strip leading "/" when searching for English
+* Reset the "force English" toggle when searching from the "share" intent
