@@ -11,11 +11,21 @@ fun isLatinText(text: String): Boolean {
 // But it should not cause conflict with character actually used with English,
 // including emojis. Check does not check specifically for Japanese.
 fun isLatinChar(code: Int): Boolean {
-    return !(code in  0x3000.. 0x9FFF  // kanas, punctuation, CJK
+    return !(
+           code in  0x3000.. 0x9FFF  // kanas, punctuation, CJK
         || code in  0xF900.. 0xFFEF  // half-width kanas, more CJK
         || code in 0x20000..0x3FFFF  // more CJK
     )
 }
+
+// Return `true` if a character is a kana character
+fun isKanaChar(code: Int): Boolean {
+    return (
+           code in  0x3000.. 0x30FF  // kanas, punctuation and symbols
+        || code in  0xFF00.. 0xFFEF  // half-width kanas
+    )
+}
+
 
 private object RomajiConverter {
     // Static tables for replacement
