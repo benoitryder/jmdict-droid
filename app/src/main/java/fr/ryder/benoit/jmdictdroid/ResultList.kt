@@ -8,6 +8,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -17,6 +21,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.ryder.benoit.jmdictdroid.ui.theme.ResultColors
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 class ResultStyles(colors: ResultColors) {
     val default = SpanStyle(fontSize = 16.sp)
@@ -32,8 +38,32 @@ class ResultStyles(colors: ResultColors) {
 fun ResultList(
     entries: List<Jmdict.Entry>,
     state: LazyListState,
+    // Called to load more items
+    loadMoreItems: () -> Unit,
+    // Number of items to the end below which more items will be loaded
+    loadDistance: Int,
     styles: ResultStyles,
 ) {
+    val needLoadMore = remember {
+        derivedStateOf {
+            // Load more items when approaching the end of the list
+            val layoutInfo = state.layoutInfo
+            val itemsCount = layoutInfo.totalItemsCount
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisibleIndex + loadDistance > itemsCount
+        }
+    }
+
+    // Call `loadMoreItems()` when `needLoadMore` state changes to true
+    LaunchedEffect(needLoadMore) {
+        snapshotFlow { needLoadMore.value }
+            .distinctUntilChanged()
+            .filter { it }
+            .collect {
+                loadMoreItems()
+            }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(8.dp),

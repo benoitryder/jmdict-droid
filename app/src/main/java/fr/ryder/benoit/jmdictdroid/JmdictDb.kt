@@ -79,32 +79,130 @@ enum class PatternMode {
   ENGLISH_TO_JAPANESE,
 }
 
-enum class PartOfSpeechFilter {
+internal enum class PartOfSpeechFilter {
     ADJECTIVE,
     NOUN,
     VERB,
 }
 
-private class SearchArgs(
-    sqlPattern: String,
-    val posFilter: PartOfSpeechFilter?,
-    var reverse: Boolean,
-    val limit: Int,
-) {
-    val sqlPattern: String
+/**
+ * Parse a search pattern and store its paremeters
+ *
+ * The parsed query can be reused, for instance for pagination.
+ *
+ * The final SQL query is built at the last moment to handle the "AUTO" mode
+ * and retrying in reverse.
+ */
+class SearchQuery(pattern: String, mode: PatternMode) {
+    // Value of the pattern passed as an argument to the SQL query
+    internal val sqlPattern: String
+    // Part-of-speech filtering
+    internal val posFilter: PartOfSpeechFilter?
+    // Search English to Japanese
+    internal var reverse: Boolean
+    // If `true`, search again in reverse if forward search returned nothing
+    internal val retryReverse: Boolean
 
     init {
-        var pattern = sqlPattern
+        Log.d(TAG, "new search query: pattern '${pattern}', mode ${mode}")
+
+        // Separate additional markers if any; ignore unknowns
+        var posFilter: PartOfSpeechFilter? = null
+        var textPattern = pattern
+        while (textPattern.contains(" +")) {
+            when (textPattern.substringAfterLast(" +")) {
+                "adj" -> posFilter = PartOfSpeechFilter.ADJECTIVE
+                "n" -> posFilter = PartOfSpeechFilter.NOUN
+                "v" -> posFilter = PartOfSpeechFilter.VERB
+                else -> null
+            }
+            textPattern = textPattern.substringBeforeLast(" +")
+        }
+        this.posFilter = posFilter
+
+        // Guess "actual" mode from pattern
+        // Keep value set to `AUTO` if not sure yet
+        var retryReverse = false
+        this.reverse = when (mode) {
+            PatternMode.JAPANESE_TO_ENGLISH -> false
+            PatternMode.ENGLISH_TO_JAPANESE -> true
+            PatternMode.AUTO -> {
+                if (textPattern.startsWith("/")) {
+                    true
+                } else if (!isLatinText(textPattern)) {
+                    false
+                } else {
+                    retryReverse = true
+                    false
+                }
+            }
+        }
+        assert(!(reverse && retryReverse))
+        this.retryReverse = retryReverse
+        if (reverse && textPattern.startsWith("/")) {
+            textPattern = textPattern.substring(1)
+        }
+
+        // Normalize wildcards (always use ASCII variants)
+        textPattern = textPattern
             .replace('*', '%')
             .replace('＊', '%')
             .replace('％', '%')
             .replace('?', '_')
             .replace('？', '_')
             .replace('＿', '_')
-        if (pattern.all { it != '%' && it != '_' }) {
-            pattern += '%'
+        // Add the default wildcard if nedeed
+        if (textPattern.all { it != '%' && it != '_' }) {
+            textPattern += '%'
         }
-        this.sqlPattern = pattern
+
+        this.sqlPattern = textPattern
+
+        Log.d(TAG, "parsed search query: sqlPattern '${sqlPattern}', pos ${posFilter}")
+    }
+
+    // Build the SQL query (without `LIMIT` clause)
+    fun buildQuery(limit: Int, offset: Int = 0): String {
+        var query = if (reverse) {
+            // English to Japanese
+            buildQueryFromPieces("gloss", "text LIKE ?1", "length(f.text)")
+        } else if (isLatinText(sqlPattern)) {
+            // Romaji to English
+            buildQueryFromPieces("reading", "romaji LIKE ?1", "length(f.romaji)")
+        } else if (sqlPattern.codePoints().allMatch { it == '%'.code || it == '_'.code || isKanaChar(it) }) {
+            // Kanji/kana to English
+            val union = 
+                ("SELECT DISTINCT entry_id, length(text) AS o FROM kanji WHERE text LIKE ?1"
+                + " UNION "
+                + "SELECT DISTINCT entry_id, length(text) AS o FROM reading WHERE text LIKE ?1")
+            // Avoid a subquery to order directly from the UNION, when possible to improve execution time.
+            if (posFilter == null) {
+                "${union} ORDER BY o"
+            } else {
+                buildQueryFromPieces("(${union})", "1", "f.o")
+            }
+        } else {
+            // Kanji to English
+            buildQueryFromPieces("kanji", "text LIKE ?1", "length(f.text)")
+        }
+        return "${query} LIMIT ${limit} OFFSET ${offset}"
+    }
+
+    // Build the SQL query, without `LIMIT` clause, from individual internal pieces
+    private fun buildQueryFromPieces(table: String, whereExpr: String, order: String): String {
+        var tables = "${table} f"
+        var whereExpr = whereExpr
+        if (posFilter != null) {
+            val posFilter = when (posFilter) {
+                PartOfSpeechFilter.ADJECTIVE -> "pos.value LIKE 'adj%'"
+                PartOfSpeechFilter.NOUN -> "(pos.value = 'n' OR pos.value LIKE 'n-%')"
+                // Exclude "suru" verbs, and vt/vi (they always come along with another one)
+                PartOfSpeechFilter.VERB -> "(pos.value LIKE 'v%' AND pos.value NOT IN ('vi', 'vt') AND pos.value NOT LIKE 'vs%')"
+            }
+            tables += ", sense s, json_each(s.data, '$.pos') AS pos"
+            whereExpr += " AND s.entry_id = f.entry_id AND ${posFilter}"
+        }
+        return "SELECT DISTINCT f.entry_id FROM ${tables} WHERE ${whereExpr} ORDER BY ${order}"
     }
 }
 
@@ -220,117 +318,27 @@ class JmdictDb(context: Context) {
         db.execSQL("CREATE INDEX g_sense ON gloss (entry_id, sense_num);")
     }
 
-    // Search in database, yield entries
-    fun search(pattern: String, mode: PatternMode, limit: Int): List<Jmdict.Entry> {
-        Log.d(TAG, "new search with pattern '${pattern}', mode ${mode}, limit ${limit}")
-
-        // Separate additional markers if any; ignore unknowns
-        var posFilter: PartOfSpeechFilter? = null
-        var textPattern = pattern
-        while (textPattern.contains(" +")) {
-            when (textPattern.substringAfterLast(" +")) {
-                "adj" -> posFilter = PartOfSpeechFilter.ADJECTIVE
-                "n" -> posFilter = PartOfSpeechFilter.NOUN
-                "v" -> posFilter = PartOfSpeechFilter.VERB
-                else -> null
-            }
-            textPattern = textPattern.substringBeforeLast(" +")
-        }
-
-        // Guess "actual" mode from pattern
-        // Keep value set to `AUTO` if not sure yet
-        var retryReverse = false
-        val reverse = when (mode) {
-            PatternMode.JAPANESE_TO_ENGLISH -> false
-            PatternMode.ENGLISH_TO_JAPANESE -> true
-            PatternMode.AUTO -> {
-                if (textPattern.startsWith("/")) {
-                    textPattern = textPattern.substring(1)
-                    true
-                } else if (!isLatinText(textPattern)) {
-                    false
-                } else {
-                    retryReverse = true
-                    false
-                }
-            }
-        }
-        assert(!(reverse && retryReverse))
-
-        if (reverse && textPattern.startsWith("/")) {
-            textPattern = textPattern.substring(1)
-        }
-
-        val searchArgs = SearchArgs(
-            sqlPattern = textPattern,
-            posFilter = posFilter,
-            reverse = reverse,
-            limit = limit,
-        )
-        Log.d(TAG, "translated SQL pattern: '${searchArgs.sqlPattern}")
-
-        var entryIds = searchFromArgs(searchArgs)
-        if (retryReverse && entryIds.isEmpty()) {
-            searchArgs.reverse = true
+    // Search in database with a re-usable query, return entries
+    fun search(query: SearchQuery, limit: Int, offset: Int = 0): List<Jmdict.Entry> {
+        Log.d(TAG, "search query '${query.sqlPattern}', limit ${limit}, offset ${offset}")
+        var entries = searchRaw(query.buildQuery(limit, offset), query.sqlPattern)
+        if (!query.reverse && query.retryReverse && entries.isEmpty()) {
+            query.reverse = true
             Log.d(TAG, "re-try auto pattern in reverse")
-            entryIds = searchFromArgs(searchArgs)
+            entries = searchRaw(query.buildQuery(limit, offset), query.sqlPattern)
         }
-
-        return collectEntries(entryIds)
+        return entries
     }
 
-    // Search for an already translated SQL pattern, return a list of matching entry IDs
-    private fun searchFromArgs(args: SearchArgs): List<Long> {
-        // Build the SQL query from individual internal pieces
-        val buildQuery: (String, String, String) -> String = { table, whereExpr, order ->
-            var tables = "${table} f"
-            var whereExpr = whereExpr
-            if (args.posFilter != null) {
-                val posFilter = when (args.posFilter) {
-                    PartOfSpeechFilter.ADJECTIVE -> "pos.value LIKE 'adj%'"
-                    PartOfSpeechFilter.NOUN -> "(pos.value = 'n' OR pos.value LIKE 'n-%')"
-                    // Exclude "suru" verbs, and vt/vi (they always come along with another one)
-                    PartOfSpeechFilter.VERB -> "(pos.value LIKE 'v%' AND pos.value NOT IN ('vi', 'vt') AND pos.value NOT LIKE 'vs%')"
-                }
-                tables += ", sense s, json_each(s.data, '$.pos') AS pos"
-                whereExpr += " AND s.entry_id = f.entry_id AND ${posFilter}"
-            }
-            "SELECT DISTINCT f.entry_id FROM ${tables} WHERE ${whereExpr} ORDER BY ${order} LIMIT ${args.limit}"
-        }
-
-        var query = if (args.reverse) {
-            // English to Japanese
-            buildQuery("gloss", "text LIKE ?1", "length(f.text)")
-        } else if (isLatinText(args.sqlPattern)) {
-            // Romaji to English
-            buildQuery("reading", "romaji LIKE ?1", "length(f.romaji)")
-        } else if (args.sqlPattern.codePoints().allMatch { it == '%'.code || it == '_'.code || isKanaChar(it) }) {
-            // Kanji/kana to English
-            val union = 
-                ("SELECT DISTINCT entry_id, length(text) AS o FROM kanji WHERE text LIKE ?1"
-                + " UNION "
-                + "SELECT DISTINCT entry_id, length(text) AS o FROM reading WHERE text LIKE ?1")
-            // Avoid a subquery to order directly from the UNION, when possible to improve execution time.
-            if (args.posFilter == null) {
-                "${union} ORDER BY o LIMIT ${args.limit}"
-            } else {
-                buildQuery("(${union})", "1", "f.o")
-            }
-        } else {
-            // Kanji to English
-            buildQuery("kanji", "text LIKE ?1", "length(f.text)")
-        }
-        Log.d(TAG, "sql query: ${query}")
-        Log.d(TAG, "sql pattern: ${args.sqlPattern}")
-
+    // Search in database using a raw SQL query and its arguments
+    fun searchRaw(sqlQuery: String, sqlPattern: String): List<Jmdict.Entry> {
         val entryIds = arrayListOf<Long>()
-        db.rawQuery(query, arrayOf(args.sqlPattern)).use { cursor ->
+        db.rawQuery(sqlQuery, arrayOf(sqlPattern)).use { cursor ->
             while (cursor.moveToNext()) {
                 entryIds.add(cursor.getLong(0))
             }
         }
-
-        return entryIds
+        return collectEntries(entryIds)
     }
 
     private fun collectEntries(entryIds: List<Long>): List<Jmdict.Entry> {

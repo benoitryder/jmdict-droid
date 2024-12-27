@@ -48,6 +48,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -66,7 +68,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import fr.ryder.benoit.jmdictdroid.ui.theme.themeResultColors
 
-private const val SEARCH_RESULTS_LIMIT = 100
+private const val SEARCH_RESULTS_PAGE = 100
+private const val SEARCH_RESULTS_LOAD_DISTANCE = SEARCH_RESULTS_PAGE / 2
+
 
 @OptIn(
     ExperimentalFoundationApi::class,
@@ -79,18 +83,39 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
     val resultStyles = ResultStyles(themeResultColors())
 
     val currentInitialQuery by rememberUpdatedState(initialQuery)
-    val queryState = rememberTextFieldState()
+    val searchPatternState = rememberTextFieldState()
     var forceEnglish by remember { mutableStateOf(false) }
-    // The result list is always fully replaced, mutableStateListOf() is not needed
-    var resultListItems by remember { mutableStateOf(emptyList<Jmdict.Entry>()) }
+    var searchQuery by remember { mutableStateOf<SearchQuery?>(null) }
+    // Offset for the next call to `loadMoreResults()`, -1 if end has been reached already
+    var searchNextOffset by remember { mutableIntStateOf(0) }
+    var resultListItems = remember { mutableStateListOf<Jmdict.Entry>() }
     val resultListState = rememberLazyListState()
+
     val searchFocusRequester = remember { FocusRequester() }
     var bottomBarVisible by remember { mutableStateOf(false) }
 
-    // Run search using current query, collect results
+    // Load more items into the existing results
+    fun loadMoreResults() {
+        assert(searchQuery != null)
+        if (searchQuery == null || searchNextOffset == -1) {
+            return
+        }
+        val newResults = jmdictDb.search(searchQuery!!, SEARCH_RESULTS_PAGE, searchNextOffset)
+        if (newResults.size == SEARCH_RESULTS_PAGE) {
+            searchNextOffset += SEARCH_RESULTS_PAGE
+        } else {
+            searchNextOffset = -1
+        }
+        resultListItems.addAll(newResults)
+    }
+
+    // Run search using a new query, collect the first page of results
     fun searchResults() {
-        val pattern = queryState.text.trim().toString()
-        var result = emptyList<Jmdict.Entry>()
+        val pattern = searchPatternState.text.trim().toString()
+        Log.d(TAG, "new search pattern: '${pattern}'")
+        searchQuery = null
+        searchNextOffset = 0
+        resultListItems.clear()
         if (pattern.isNotEmpty()) {
             val patternMode = if (forceEnglish) {
                 if (isLatinText(pattern)) {
@@ -102,10 +127,9 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
             } else {
                 PatternMode.AUTO
             }
-            result = jmdictDb.search(pattern, patternMode, SEARCH_RESULTS_LIMIT)
-            Log.d(TAG, "new results: ${result.size}")
+            searchQuery = SearchQuery(pattern, patternMode)
+            loadMoreResults()
         }
-        resultListItems = result
         bottomBarVisible = false
     }
 
@@ -119,15 +143,15 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
             searchFocusRequester.requestFocus()
         } else {
             forceEnglish = false
-            queryState.setTextAndPlaceCursorAtEnd(initialQuery)
+            searchPatternState.setTextAndPlaceCursorAtEnd(initialQuery)
             searchResults()
             // Requesting focus then hiding the keyboard would be better, but it doesn't work as expected
             keyboardController?.hide()
         }
     }
 
-    // Reset scroll when result is updated
-    LaunchedEffect(resultListItems) {
+    // Reset scroll when a new pattern is used (more convenient than watching the result list)
+    LaunchedEffect(searchQuery) {
         resultListState.scrollToItem(0)
     }
 
@@ -160,7 +184,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
                 color = MaterialTheme.colorScheme.primaryContainer,
             ) {
                 AppSearchBar(
-                    queryState = queryState,
+                    searchPatternState = searchPatternState,
                     forceEnglish = forceEnglish,
                     onSearch = { searchResults() },
                     onForceEnglishChange = { forceEnglish = it },
@@ -177,7 +201,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
                     IconButton(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         onClick = {
-                            queryState.clearText()
+                            searchPatternState.clearText()
                             focusSearchWithKeyboard()
                         },
                     ) {
@@ -227,7 +251,13 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
     ) {
             if (resultListItems.isNotEmpty()) {
                 SelectionContainer {
-                    ResultList(resultListItems, resultListState, resultStyles)
+                    ResultList(
+                        entries = resultListItems,
+                        state = resultListState,
+                        loadMoreItems = { loadMoreResults() },
+                        loadDistance = SEARCH_RESULTS_LOAD_DISTANCE,
+                        styles = resultStyles,
+                    )
                 }
             } else {
                 Text(
@@ -248,7 +278,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
 
 @Composable
 fun AppSearchBar(
-    queryState: TextFieldState,
+    searchPatternState: TextFieldState,
     forceEnglish: Boolean,
     onSearch: () -> Unit,
     onForceEnglishChange: (Boolean) -> Unit,
@@ -266,7 +296,7 @@ fun AppSearchBar(
             .fillMaxWidth(),
         inputField = {
             SearchBarDefaults.InputField(
-                state = queryState,
+                state = searchPatternState,
                 onSearch = { onSearch() },
                 expanded = expanded,
                 onExpandedChange = { expanded = it },
@@ -335,4 +365,3 @@ internal suspend fun PointerInputScope.detectTapWithoutConsume(onTap: () -> Unit
         }
     }
 }
-
