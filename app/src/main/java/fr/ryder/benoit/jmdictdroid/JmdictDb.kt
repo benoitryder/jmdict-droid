@@ -79,7 +79,7 @@ enum class PatternMode {
   ENGLISH_TO_JAPANESE,
 }
 
-internal enum class PartOfSpeechFilter {
+enum class PartOfSpeechFilter {
     ADJECTIVE,
     NOUN,
     VERB,
@@ -97,7 +97,7 @@ class SearchQuery(pattern: String, mode: PatternMode) {
     // Value of the pattern passed as an argument to the SQL query
     internal val sqlPattern: String
     // Part-of-speech filtering
-    internal val posFilter: PartOfSpeechFilter?
+    var posFilter: PartOfSpeechFilter?
     // Search English to Japanese
     internal var reverse: Boolean
     // If `true`, search again in reverse if forward search returned nothing
@@ -193,7 +193,7 @@ class SearchQuery(pattern: String, mode: PatternMode) {
         var tables = "${table} f"
         var whereExpr = whereExpr
         if (posFilter != null) {
-            val posFilter = when (posFilter) {
+            val posFilter = when (posFilter!!) {
                 PartOfSpeechFilter.ADJECTIVE -> "pos.value LIKE 'adj%'"
                 PartOfSpeechFilter.NOUN -> "(pos.value = 'n' OR pos.value LIKE 'n-%')"
                 // Exclude "suru" verbs, and vt/vi (they always come along with another one)

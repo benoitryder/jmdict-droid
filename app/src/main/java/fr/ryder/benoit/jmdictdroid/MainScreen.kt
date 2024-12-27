@@ -25,10 +25,11 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.BottomAppBar
@@ -56,7 +57,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -75,7 +75,6 @@ private const val SEARCH_RESULTS_LOAD_DISTANCE = SEARCH_RESULTS_PAGE / 2
 @OptIn(
     ExperimentalFoundationApi::class,
     ExperimentalLayoutApi::class,
-    ExperimentalMaterial3ExpressiveApi::class,
 )
 @Composable
 fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: String) {
@@ -86,6 +85,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
     val searchPatternState = rememberTextFieldState()
     var forceEnglish by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf<SearchQuery?>(null) }
+    var posFilter by remember { mutableStateOf<PartOfSpeechFilter?>(null) }
     // Offset for the next call to `loadMoreResults()`, -1 if end has been reached already
     var searchNextOffset by remember { mutableIntStateOf(0) }
     var resultListItems = remember { mutableStateListOf<Jmdict.Entry>() }
@@ -128,6 +128,9 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
                 PatternMode.AUTO
             }
             searchQuery = SearchQuery(pattern, patternMode)
+            if (posFilter != null) {
+                searchQuery!!.posFilter = posFilter
+            }
             loadMoreResults()
         }
         bottomBarVisible = false
@@ -195,31 +198,21 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
         },
         bottomBar = {
             if (bottomBarVisible) {
-                BottomAppBar(
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
-                    IconButton(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        onClick = {
+                BottomActionBar(
+                    selectedFilter = posFilter,
+                    onFocusSearch = { clear ->
+                        if (clear) {
+                            posFilter = null
                             searchPatternState.clearText()
-                            focusSearchWithKeyboard()
-                        },
-                    ) {
-                        Icon(Icons.Filled.Clear, contentDescription = "New search")
-                    }
-                    IconButton(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        onClick = { focusSearchWithKeyboard() },
-                    ) {
-                        Icon(Icons.Filled.Keyboard, contentDescription = "Edit search")
-                    }
-                    // Placeholder, does nothing for now
-                    Icon(
-                        Icons.Filled.Settings,
-                        contentDescription = "empty",
-                        modifier = Modifier.alpha(0f).fillMaxWidth().weight(1f),
-                    )
-                }
+                        }
+                        focusSearchWithKeyboard()
+                    },
+                    onFilter = { filter ->
+                        Log.d(TAG, "set pos filter: ${filter}")
+                        posFilter = filter
+                        searchResults()
+                    },
+                )
             }
         },
     ) { innerPadding ->
@@ -347,6 +340,59 @@ fun SearchMenuIcon(
                 onClick = { navController.navigate("help") },
                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null) }
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun BottomActionBar(
+    selectedFilter: PartOfSpeechFilter?,
+    // Called on action to focus the search, parameter is `true` to also clear the search
+    onFocusSearch: (Boolean) -> Unit,
+    // Called when changing the part-of-speech filter
+    onFilter: (PartOfSpeechFilter?) -> Unit,
+) {
+    val allFilters = arrayOf(
+        Pair("Adjectives", PartOfSpeechFilter.ADJECTIVE),
+        Pair("Nouns", PartOfSpeechFilter.NOUN),
+        Pair("Verbs", PartOfSpeechFilter.VERB),
+    )
+
+    var filtersExpanded by remember { mutableStateOf(false) }
+    BottomAppBar(
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        IconButton(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            onClick = { onFocusSearch(true) }
+        ) {
+            Icon(Icons.Filled.Clear, contentDescription = "New search")
+        }
+        IconButton(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            onClick = { onFocusSearch(false) }
+        ) {
+            Icon(Icons.Filled.Keyboard, contentDescription = "Edit search")
+        }
+        IconButton(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            onClick = { filtersExpanded = !filtersExpanded },
+        ) {
+            Icon(Icons.Filled.FilterAlt, contentDescription = "Filters")
+            DropdownMenu(
+                expanded = filtersExpanded,
+                onDismissRequest = { filtersExpanded = false },
+            ) {
+                allFilters.forEach { (text, filter) ->
+                    val selected = filter == selectedFilter
+                    DropdownMenuItem(
+                        text = { Text(text) },
+                        trailingIcon = { if (selected) Icon(Icons.Filled.Check, contentDescription = null) else null },
+                        onClick = { onFilter(if (selected) null else filter) },
+                    )
+                }
+            }
         }
     }
 }
