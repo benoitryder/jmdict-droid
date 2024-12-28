@@ -44,10 +44,10 @@ val resultStyleDark = ResultColors(
 
 @Composable
 fun themeResultColors(): ResultColors {
-    if (isSystemInDarkTheme()) {
-        return resultStyleDark
+    return if (isSystemInDarkTheme()) {
+        resultStyleDark
     } else {
-        return resultStyleLight
+        resultStyleLight
     }
 }
 
