@@ -3,10 +3,15 @@ package fr.ryder.benoit.jmdictdroid
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -17,6 +22,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.Placeholder
@@ -55,7 +61,8 @@ fun HelpScreen(navController: NavController) {
         Column(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
 			HelpContent()
@@ -92,6 +99,14 @@ fun HelpContent() {
         }
     }
 
+    fun inlineIconContent(icon: ImageVector): InlineTextContent {
+        return InlineTextContent(
+            Placeholder(width = 12.sp, height = 12.sp, placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter),
+        ) {
+            Icon(icon, it)
+        }
+    }
+
     Text(
         modifier = Modifier.padding(12.dp),
         text = buildAnnotatedString {
@@ -115,15 +130,27 @@ fun HelpContent() {
             append("\t\tう/い are converted to "); appendEmph("u"); append("/"); appendEmph("i"); append("\n")
             append("Apostrophes are not used.\n")
 
-            appendTitle("Interface")
-            append("Double-tap the result area to quickly refocus the search input and open the keyboard.\n")
+            appendTitle("Part-of-speech filters")
+            append("Results can be filtered by \"kind\" of word (displayed before definitions, in red).\n")
+            append("An entry is returned if at least one sense is matching.\n")
+            appendEmph("\t\tadjectives"); append(": adjectives, including nouns which take a の ("); appendEmph("adj*"); append(")\n")
+            appendEmph("\t\tnouns"); append(": nouns, including those as prefix/suffix ("); appendEmph("n, n-*"); append(")\n")
+            appendEmph("\t\tverbs"); append(": all verbs except "); appendEmph("suru"); append("-verbs ("); appendEmph("vs*"); append(")\n")
+            append("Filters can be selected from the "); appendInlineContent("iconFilter", "[filter]"); append(" menu in the bottom bar, or by adding ")
+            appendCode("+adj"); append(", "); appendCode("+n"); append(" or "); appendCode("+v"); append(" at the end of the search pattern.\n")
+
+            appendTitle("Bottom bar")
+            append("Tap the result area to display a bottom bar with the following actions:.\n")
+            appendEmph("\t\t"); appendInlineContent("iconClear", "[clear]"); append(" clear search pattern and filter and focus the search bar\n")
+            appendEmph("\t\t"); appendInlineContent("iconKeyboard", "[keyboard]"); append(" focus the search bar\n")
+            appendEmph("\t\t"); appendInlineContent("iconFilter", "[filter]"); append(" open the part-of-speech filter menu\n")
+            append("Double-tap at the location of an action icon to quickly execute it (for instance to focus the search bar without having to reach the top of the screen).\n")
         },
 		inlineContent = mapOf(
-			Pair("iconReverse", InlineTextContent(
-				Placeholder(width = 12.sp, height = 12.sp, placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter)
-			) {
-				Icon(Icons.Filled.SwapHoriz, "swap")
-			}),
+			"iconReverse" to inlineIconContent(Icons.Filled.SwapHoriz),
+			"iconClear" to inlineIconContent(Icons.Filled.Clear),
+			"iconKeyboard" to inlineIconContent(Icons.Filled.Keyboard),
+			"iconFilter" to inlineIconContent(Icons.Filled.FilterAlt),
 		),
     )
 }
