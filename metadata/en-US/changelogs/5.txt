@@ -1,0 +1,4 @@
+* Add filtering on part-of-speech (adjectives, nouns, verbs)
+* Add togglable toolbar with action to focus the search pattern, clear it, or set part-of-speech filter
+* Don't limit display to the first 50 results
+* Searching for Japanese kanji is now a bit faster
