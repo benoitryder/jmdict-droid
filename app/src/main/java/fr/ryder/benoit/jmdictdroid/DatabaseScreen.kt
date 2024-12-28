@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -148,9 +149,11 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                     text = statusMessage,
                 )
             } else {
-                // Add an empty text to avoid shifting JmdictTerms when download starts
+                // Add an empty text to avoid shifting other items when download starts
                 Text("\n")
             }
+
+            Spacer(modifier = Modifier.weight(1f))
 
             JmdictTerms()
         }
