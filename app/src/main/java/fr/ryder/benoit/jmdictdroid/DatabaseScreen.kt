@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -25,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,7 +97,11 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                 }
             }
             val scope = rememberCoroutineScope()
+            var dbStatistics by remember { mutableStateOf(JmdictDb.Statistics()) }
 
+            LaunchedEffect(Unit) {
+                dbStatistics = jmdictDb.getStatistics()
+            }
 
             Text(
                 modifier = Modifier.padding(12.dp),
@@ -129,6 +135,7 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                         val uri = Uri.parse(dictUri)
                         errorMessage = downloadAndUpdateDatabase(context, jmdictDb, uri) { status -> statusMessage = status }
                         inProgress = false
+                        dbStatistics = jmdictDb.getStatistics()
                     }
                 }
             ) {
@@ -151,6 +158,29 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
             } else {
                 // Add an empty text to avoid shifting other items when download starts
                 Text("\n")
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(8.dp))
+
+            BasicText(
+                modifier = Modifier.padding(12.dp),
+                text = if (dbStatistics.totalEntries > 0) {
+                    "database contains ${dbStatistics.totalEntries} entries, ${dbStatistics.totalSenses} senses"
+                } else {
+                    "database is empty"
+                }
+            )
+
+            Button(
+                modifier = Modifier.padding(8.dp),
+                enabled = !inProgress && dbStatistics.totalEntries > 0,
+                onClick = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate("main")
+                    }
+                }
+            ) {
+                Text("Go to main screen")
             }
 
             Spacer(modifier = Modifier.weight(1f))

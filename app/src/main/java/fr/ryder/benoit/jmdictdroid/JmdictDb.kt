@@ -402,5 +402,26 @@ class JmdictDb(context: Context) {
 
         return entries.values.toList()
     }
+
+    class Statistics(
+        val totalEntries: Int = 0,
+        val totalSenses: Int = 0,
+    )
+
+    // Return general statistics on the current database
+    fun getStatistics(): Statistics {
+        if (!isInitialized()) {
+            return Statistics()
+        }
+        db.rawQuery("SELECT COUNT(DISTINCT entry_id), COUNT(*) FROM gloss", null).use { cursor ->
+            if (cursor.moveToNext()) {
+                return Statistics(
+                    totalEntries = cursor.getInt(0),
+                    totalSenses = cursor.getInt(1),
+                )
+            }
+        }
+        return Statistics()
+    }
 }
 
