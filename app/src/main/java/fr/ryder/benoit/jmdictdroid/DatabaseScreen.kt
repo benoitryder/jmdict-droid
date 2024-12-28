@@ -130,6 +130,8 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
                 modifier = Modifier.padding(15.dp),
                 enabled = !inProgress,
                 onClick = {
+                    statusMessage = ""
+                    errorMessage = ""
                     inProgress = true
                     scope.launch {
                         val uri = Uri.parse(dictUri)
@@ -164,7 +166,9 @@ fun DatabaseScreen(navController: NavController, jmdictDb: JmdictDb) {
 
             BasicText(
                 modifier = Modifier.padding(12.dp),
-                text = if (dbStatistics.totalEntries > 0) {
+                text = if (inProgress) {
+                    "database is being updated"
+                } else if (dbStatistics.totalEntries > 0) {
                     "database contains ${dbStatistics.totalEntries} entries, ${dbStatistics.totalSenses} senses"
                 } else {
                     "database is empty"
