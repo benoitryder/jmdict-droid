@@ -91,6 +91,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
     var resultListItems = remember { mutableStateListOf<Jmdict.Entry>() }
     val resultListState = rememberLazyListState()
 
+    var searchComposed by remember { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
     var bottomBarVisible by remember { mutableStateOf(false) }
 
@@ -107,6 +108,20 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
             searchNextOffset = -1
         }
         resultListItems.addAll(newResults)
+    }
+
+    // Focus the search bar, only if composed, to avoid "FocusRequester is not initialized" error
+    fun focusSearch() {
+        if (searchComposed) {
+            searchFocusRequester.requestFocus()
+        }
+    }
+
+    // Helper to let the user type a search
+    fun focusSearchWithKeyboard() {
+        focusSearch()
+        keyboardController?.show()
+        bottomBarVisible = false
     }
 
     // Run search using a new query, collect the first page of results
@@ -143,7 +158,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
         // If the query is empty, request focus to start typing
         // Otherwise, hide the keyboard to free more space for the results
         if (initialQuery == "") {
-            searchFocusRequester.requestFocus()
+            focusSearch()
         } else {
             forceEnglish = false
             searchPatternState.setTextAndPlaceCursorAtEnd(initialQuery)
@@ -160,13 +175,6 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
 
     // Hide bottom bar whenever the IME state changes
     LaunchedEffect(WindowInsets.isImeVisible) {
-        bottomBarVisible = false
-    }
-
-    // Helper to let the user type a search
-    fun focusSearchWithKeyboard() {
-        searchFocusRequester.requestFocus()
-        keyboardController?.show()
         bottomBarVisible = false
     }
 
@@ -194,6 +202,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
                     focusRequester = searchFocusRequester,
                     navController = navController,
                 )
+                searchComposed = true
             }
         },
         bottomBar = {
