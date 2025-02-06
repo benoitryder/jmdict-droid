@@ -250,7 +250,7 @@ fun MainScreen(navController: NavController, jmdictDb: JmdictDb, initialQuery: S
                         }
                     }
                 }
-    ) {
+        ) {
             if (resultListItems.isNotEmpty()) {
                 SelectionContainer {
                     ResultList(
