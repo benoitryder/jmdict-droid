@@ -1,0 +1,2 @@
+* Fix possible crash when resizing and rotating the app (#3)
+* Preserve UI state when resizing or rotating the app
